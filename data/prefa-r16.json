@@ -1,0 +1,11 @@
+{
+  "id": "prefa-r16",
+  "name": "PREFA R.16",
+  "moduleWidthMm": 700,
+  "moduleHeightMm": 420,
+  "minRoofSlopeDeg": 17,
+  "consumptionPerM2": 3.4,
+  "weightKgPerM2": 2.5,
+  "manufacturer": "PREFA",
+  "note": "Konfigurační soubor připravený pro budoucí datový model krytin."
+}
