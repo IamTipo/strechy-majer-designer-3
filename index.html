@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STŘECHY MAJER Designer 3.0-dev – PREFA R.16</title>
+<link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="images/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="images/favicon.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="images/favicon-512.png">
+</head>
+<body>
+<div class="topbar"><div class="logoBox"><a class="logoLink" href="https://www.strechymajer.cz" target="_blank" rel="noopener noreferrer" title="Otevřít www.strechymajer.cz"><img src="images/logo.png" alt="STŘECHY MAJER"></a></div><div class="appTitle"><b>STŘECHY MAJER Designer 3.0-dev</b><span>Kladečský plán PREFA R.16</span></div><div class="projectMeta"><b id="topProject">Demo projekt</b><span>PREFA R.16 · <span class="saveState">● Uloženo</span></span></div><div class="nav"><button onclick="newProject()">＋ NOVÝ</button><button onclick="openProject()">▢ OTEVŘÍT</button><button onclick="saveProject()">💾 ULOŽIT</button><button onclick="printPdf()">PDF</button><button onclick="exportCsv()">CSV</button><button onclick="window.print()">TISK</button></div><button onclick="showHelp()">? NÁPOVĚDA</button><div class="version">v3.0-dev</div></div>
+<div class="app">
+<aside class="side">
+<h2>Základní parametry</h2>
+<label>Šířka střechy – okap / hřeben</label><div class="row2"><input id="roofW" type="number" value="12400"><span>mm</span></div>
+<label>Délka střechy – okap → hřeben</label><div class="row2"><input id="roofH" type="number" value="8600"><span>mm</span></div>
+<label>Sklon střechy</label><div class="row2"><input id="slope" type="number" value="22"><span>°</span></div><div id="slopeStatus" class="status">Vyhovuje (min. 17°)</div>
+<h3>Krytina</h3><select id="product"><option>PREFA R.16</option></select><p class="help">Krycí rozměr: <b>700 × 420 mm</b><br>Spotřeba: cca <b>3,4 ks/m²</b></p>
+<h3>Vazba / PREFA R.16</h3>
+<div class="infoCard"><b>1/2 TAŠKY</b>Každá následující řada je posunuta o 350 mm.</div>
+<div class="prefaCard">
+  <div class="prefaMini" aria-label="Fotografie základní tašky PREFA R.16">
+    <img src="images/prefa-r16.webp" alt="PREFA R.16 – základní taška" style="display:block;width:100%;height:auto;max-height:82px;object-fit:contain;">
+  </div>
+  <div class="prefaParams">
+    <div class="prefaParam"><span>Krycí rozměr</span><strong>700 × 420 mm</strong></div>
+    <div class="prefaParam"><span>Spotřeba</span><strong>3,4 ks/m²</strong></div>
+    <div class="prefaParam"><span>Min. sklon</span><strong>17°</strong></div>
+    <div class="prefaParam"><span>Hmotnost</span><strong>cca 2,5 kg/m²</strong></div>
+  </div>
+  <div class="prefaLinks">
+    <a href="https://uk.prefa.com/product-catalogue/roof-systems/r16-roof-tile/" target="_blank" rel="noopener noreferrer">PREFA R.16 – produkt</a>
+    <a class="secondary" href="https://uk.prefa.com/download-centre/" target="_blank" rel="noopener noreferrer">Montážní podklady PREFA</a>
+  </div>
+  <div class="prefaNote">Technické údaje jsou uvedené jako rychlá orientace. Pro montáž vždy platí aktuální podklady výrobce PREFA.</div>
+</div>
+<h3>Separační vrstva</h3><div id="sepStatus" class="status warn">Povinná při sklonu 17–25° dle pokynů PREFA</div>
+<h3>Překážky <button class="small primary" style="float:right" onclick="showObstacle()">+ PŘIDAT</button></h3><div id="obstacleList" class="obstacles"></div>
+
+</aside>
+<main class="main">
+<div class="toolrow"><button class="primary" onclick="showObstacle()">+ Přidat překážku</button><button class="ghost" onclick="optimize()">Optimalizovat posun</button><button class="ghost" onclick="recalc()">Přepočítat plán</button><span class="toolHint">Kliknutí řadu trvale označí modře, najetí myší ji dočasně zvýrazní zeleně.</span></div>
+<div class="canvasWrap"><div class="canvasHeader"><label class="canvasCheck"><input id="showDims" type="checkbox" checked onchange="recalc()"> Zobrazit kóty</label></div><svg id="planSvg" width="1240" height="780" viewBox="0 0 1240 780"></svg></div>
+<div class="legend"><span><span class="sq" style="background:#c75b36"></span>Komín</span><span><span class="sq" style="background:#0871b9"></span>Střešní okno</span><span><span class="sq" style="background:#8d55ad"></span>Vikýř</span><span><span class="sq" style="background:#4f9655"></span>Prostup</span><span><i></i>Vazba 1/2 tašky</span></div>
+<section class="tablePanel"><h3>Rozpis řad a dořezů u detailů</h3><div class="tabs"><button id="tabRows" class="active" onclick="setTab('rows')">ŘADY</button><button id="tabCuts" onclick="setTab('cuts')">DOŘEZY U DETAILŮ</button></div>
+<div id="rowsPanel"><table><thead><tr><th>Řada</th><th>Kóta od okapu</th><th>Kóta od hřebene</th><th>Odsazení</th><th>Kusů</th><th>Levý kraj</th><th>Pravý kraj</th></tr></thead><tbody id="rowTbody"></tbody></table></div>
+<div id="cutsPanel" style="display:none"><table><thead><tr><th>Řada</th><th>Překážka</th><th>Levý díl</th><th>Pravý díl</th><th>Stav</th></tr></thead><tbody id="cutTbody"></tbody></table></div></section>
+<div class="footer"><div><span class="brand">STŘECHY MAJER Designer 3.0-dev</span><span class="sub">Kladečský plán PREFA R.16</span></div><div class="meta"><b>www.strechymajer.cz</b><br>v3.0-dev</div></div>
+</main>
+<aside class="right">
+<div class="coffeeCard"><div class="coffeeHead"><div class="coffeeIcon">☕</div><div><b>Podpora na kafe</b><span>Dobrovolná podpora vývoje aplikace.</span></div></div><div class="coffeeQrWrap"><img class="coffeeQr" src="images/qr-kafe.png" alt="QR Platba – podpora vývoje"><div class="coffeeNote"><strong>Naskenujte QR</strong>QR Platba – podpora vývoje aplikace.</div></div></div>
+<div class="summary"><h3>Shrnutí</h3><div class="sumline"><span>Celková plocha střechy</span><b id="areaSum">–</b></div><div class="sumline"><span>Spotřeba tašek</span><b id="tileSum">–</b></div><div class="sumline"><span>Dořezová plocha</span><b id="wasteSum">–</b></div><div class="sumline"><span>Počet překážek</span><b id="obsSum">–</b></div></div>
+<div id="cutControl" class="okbox">Min. dořez vyhovuje.</div><div id="tileInfo" class="tileInfo"><b>Kontrola tašky</b><span>Klikněte na tašku v grafickém návrhu.</span></div><div id="obstacleInfo" class="tileInfo"><b>Kontrola detailu</b><span>Klikněte na překážku v grafickém návrhu.</span></div><div id="optInfo" class="warnbox">Optimalizace posunu: aktivní.</div>
+</aside>
+</div>
+<div id="helpModal" class="modal"><div class="dialog helpDialog"><div class="helpTop"><div><h2>STŘECHY MAJER Designer 3.0-dev – nápověda</h2><p>Stručný pracovní manuál pro kladečský plán krytiny PREFA R.16.</p></div><button onclick="hideHelp()">Zavřít</button></div><div class="helpBody">
+<h3>O aplikaci</h3>
+<p><b>STŘECHY MAJER Designer</b> je pracovní nástroj pro návrh kladečského plánu střešní krytiny <b>PREFA R.16</b>.</p>
+<p>Aplikace vznikla na základě praktických zkušeností realizační firmy <b>STŘECHY MAJER</b> a slouží hlavně pro přípravu pokládky a kontrolu přímo na stavbě.</p>
+<div class="helpNotice"><b>Důležité:</b> aplikace nenahrazuje projektovou dokumentaci ani montážní předpisy výrobce. Výpočty vždy vycházejí ze zadaných rozměrů.</div>
+
+<h3>1. Zadání střešní roviny</h3>
+<p>V levém panelu zadejte základní rozměry střešní plochy:</p>
+<ul><li>délku okapové hrany,</li><li>délku střešní roviny od okapu k hřebeni,</li><li>sklon střechy.</li></ul>
+<p>Po změně rozměrů se grafický návrh i tabulky automaticky přepočítají. Pokud sklon neodpovídá požadavku pro PREFA R.16, aplikace jej zvýrazní červeně.</p>
+
+<h3>2. Překážky a detaily</h3>
+<p>Do střešní roviny lze vkládat komíny, vikýře, střešní okna, prostupy nebo jiné detaily.</p>
+<p>U každého detailu se zadává typ, šířka, výška, vzdálenost od levého štítu a vzdálenost od okapní hrany.</p>
+
+<h3>3. Tabulka překážek</h3>
+<p>Tabulka překážek slouží jako seznam i editor všech detailů ve střešní ploše.</p>
+<h4>Přidání překážky</h4>
+<p>Nový detail vložíte tlačítkem <b>Přidat překážku</b>. Po uložení se ihned zobrazí v grafickém návrhu.</p>
+<h4>Úprava překážky</h4>
+<p>Uložený detail lze kdykoliv upravit tlačítkem tužky v seznamu překážek. Po změně se přepočítá grafika, tabulky, kóty i kontrola kolizí.</p>
+<h4>Kontrola kolizí</h4>
+<p>Aplikace kontroluje, zda je detail celý uvnitř střešní roviny a zda se nepřekrývá s jiným detailem. Při kolizi se změna nepovolí nebo se problém zvýrazní.</p>
+
+<h3>4. Grafický návrh</h3>
+<p>Grafický návrh zobrazuje rozmístění tašek, vazbu řad, překážky, základní kóty a kontrolní značky. Návrh se automaticky přizpůsobuje dostupnému prostoru.</p>
+<p>V grafice jsou ponechány pouze důležité kóty, aby výkres zůstal čitelný.</p>
+
+<h3>5. Kontrola řad</h3>
+<p>Řadu lze vybrat kliknutím v grafickém návrhu, kliknutím na číslo řady nebo kliknutím v tabulce.</p>
+<ul><li><b>Modrá</b> označuje vybranou řadu.</li><li><b>Zelená</b> označuje řadu, nad kterou je právě kurzor.</li></ul>
+<p>Zvýraznění je propojeno mezi grafickým návrhem a tabulkami.</p>
+
+<h3>6. Kontrola tašky</h3>
+<p>Při najetí myší na tašku se zobrazí její pořadové číslo počítané od levého štítu.</p>
+<p>Po kliknutí na tašku se v panelu <b>Kontrola tašky</b> zobrazí číslo řady, číslo tašky od levého štítu, kóta od okapu a kóta od levého štítu. Tyto údaje slouží k rychlé kontrole polohy tašky při pokládce.</p>
+
+<h3>7. Kontrola detailu</h3>
+<p>Po najetí nebo kliknutí na překážku se zvýrazní její základní kóty.</p>
+<p>Po kliknutí se v panelu <b>Kontrola detailu</b> zobrazí nejdříve typ a rozměry detailu, potom vzdálenosti od levého štítu a od okapní hrany.</p>
+
+<h3>8. Rozpis řad a dořezů u detailů</h3>
+<p>Tabulka obsahuje pro každou řadu číslo řady, kótu od okapu, kótu od hřebene, vazbu řady, počet celých tašek, krajní dořezy a dořezy u detailů.</p>
+<p>Kliknutím na řadu v tabulce se označí odpovídající řada v grafickém návrhu.</p>
+
+<h3>9. Doporučený pracovní postup</h3>
+<ol><li>Zadejte skutečné rozměry střešní roviny.</li><li>Ověřte sklon střechy.</li><li>Vložte všechny překážky a detaily.</li><li>Zkontrolujte kolize a návaznosti detailů.</li><li>Projděte rozpis řad a dořezů.</li><li>Pomocí kontroly tašky ověřte vybrané pozice na střeše.</li><li>Před montáží porovnejte návrh se skutečným stavem na stavbě a montážním návodem PREFA.</li></ol>
+
+<div class="helpTip"><b>Zpětná vazba:</b> aplikace je průběžně vyvíjena podle zkušeností z reálných staveb. Pokud objevíte chybu nebo máte nápad na vylepšení, každý podnět pomůže aplikaci posunout dál.</div>
+</div><div class="helpFoot"><button class="primary" onclick="hideHelp()">Zavřít nápovědu</button></div></div></div>
+<div id="modal" class="modal"><div class="dialog"><h2 id="modalTitle">Překážka</h2><div class="form">
+<label>Název</label><input id="obsName" value="Komín"><label>Typ</label><select id="obsType"><option value="komin">Komín</option><option value="okno">Střešní okno</option><option value="vikyr">Vikýř</option><option value="prostup">Prostup</option></select>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label>X od levého štítu</label><input id="obsX" type="number" value="3300"></div><div><label>Y od okapu</label><input id="obsY" type="number" value="5200"></div><div><label>Šířka</label><input id="obsW" type="number" value="1200"></div><div><label>Výška</label><input id="obsH" type="number" value="800"></div></div>
+</div><div class="dialogActions"><button onclick="hideObstacle()">Zrušit</button><button class="primary" onclick="saveObstacle()">Uložit</button></div></div></div>
+<input id="fileOpen" type="file" accept=".smr16,application/json" style="display:none">
+<script src="js/app.js"></script>
+</body></html>
