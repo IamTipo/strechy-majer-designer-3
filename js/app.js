@@ -15,9 +15,25 @@ function rowTiles(W,r){let off=rowOffset(r), arr=[]; let first=Math.floor((-off)
 function analyzeRows(){let {W,H}=getParams(); let rows=Math.ceil(H/TILE_H); let out=[],cuts=[]; for(let r=1;r<=rows;r++){let tiles=rowTiles(W,r); let full=tiles.filter(t=>t.full).length; let left=tiles[0]?.w||0, right=tiles[tiles.length-1]?.w||0; let y0=(r-1)*TILE_H,y1=Math.min(H,r*TILE_H); let note=(r%2===0?'1/2 na začátku':'Celá taška'); if(left<MIN_CUT||right<MIN_CUT) note+=' – úzký kraj'; for(const o of state.obstacles){if(o.y<y1 && o.y+o.h>y0){let lt=tiles.find(t=>t.a<=o.x && t.b>o.x), rt=tiles.find(t=>t.a<o.x+o.w && t.b>=o.x+o.w); let lc=lt?o.x-lt.a:0, rc=rt?rt.b-(o.x+o.w):0; let ok=lc>=MIN_CUT&&rc>=MIN_CUT; cuts.push({row:r,obs:o.name,left:lc,right:rc,ok}); if(!ok) note+=' – řešit lemování/posun';}}
  out.push({row:r,measureOkap:Math.min(H,r*TILE_H),measureHreben:Math.max(0,H-Math.min(H,r*TILE_H)),offset:rowOffset(r),tiles,full,left,right,note,bad:left<MIN_CUT||right<MIN_CUT})} state.rows=out; state.cuts=cuts;}
 function scoreShift(shift){let old=state.baseShift; state.baseShift=shift; analyzeRows(); let score=0; for(const row of state.rows){if(row.left<MIN_CUT)score+=10000+(MIN_CUT-row.left)*10;if(row.right<MIN_CUT)score+=10000+(MIN_CUT-row.right)*10; score+=Math.abs(row.left-row.right)/20} for(const c of state.cuts){if(!c.ok)score+=5000+(Math.max(0,MIN_CUT-c.left)+Math.max(0,MIN_CUT-c.right))*20} state.baseShift=old; return score}
-function optimize(){let best=0,b=1e99,tested=0; for(let s=0;s<TILE_W;s+=10){let sc=scoreShift(s);tested++; if(sc<b){b=sc;best=s}} state.baseShift=best; N('optInfo').innerHTML='Optimalizace posunu: <b>AKTIVNÍ</b><br>Testováno variant: '+tested+'<br>Vybraný posun: '+mm(best); recalc();}
+function flashActionButton(doneText){
+ const button=document.activeElement;
+ if(!button || button.tagName!=='BUTTON') return;
+ const original=button.dataset.originalLabel || button.textContent;
+ button.dataset.originalLabel=original;
+ button.textContent=doneText;
+ button.disabled=true;
+ window.setTimeout(()=>{
+  button.textContent=original;
+  button.disabled=false;
+ },1100);
+}
+function optimize(){let best=0,b=1e99,tested=0; for(let s=0;s<TILE_W;s+=10){let sc=scoreShift(s);tested++; if(sc<b){b=sc;best=s}} state.baseShift=best; N('optInfo').innerHTML='Optimalizace posunu: <b>AKTIVNÍ</b><br>Testováno variant: '+tested+'<br>Vybraný posun: '+mm(best); recalc(); flashActionButton('✓ Optimalizováno');}
 function recalc(){let p=getParams(); let slope=N('slopeStatus'); if(p.slope<MIN_SLOPE){slope.className='status bad';slope.textContent='Nevyhovuje – min. sklon PREFA R.16 je 17°';}else{slope.className='status';slope.textContent='Vyhovuje (min. 17°)';} let sep=N('sepStatus'); if(p.slope>=MIN_SLOPE&&p.slope<=SEP_MAX){sep.className='status warn';sep.textContent='Povinná při sklonu 17–25° dle pokynů PREFA';}else if(p.slope<MIN_SLOPE){sep.className='status bad';sep.textContent='Nejdříve ověřit vhodnost krytiny pro daný sklon';}else{sep.className='status';sep.textContent='Běžný rozsah – ověřte dle skladby střechy';}
  analyzeRows(); validateSelectedTile(); validateSelectedObstacle(); renderObstacles(); renderTables(); renderSvg(); updateTileInfo(); updateObstacleInfo(); let area=p.W*p.H/1e6; let tiles=Math.ceil(area*CONS); let obsArea=state.obstacles.reduce((a,o)=>a+o.w*o.h/1e6,0); N('areaSum').textContent=area.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' m²'; N('tileSum').textContent=fmt(tiles)+' ks'; N('wasteSum').textContent=obsArea.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' m²'; N('obsSum').textContent=state.obstacles.length; let min=999999; state.cuts.forEach(c=>{min=Math.min(min,c.left,c.right)}); let overlaps=getOverlapPairs(); if(overlaps.length){N('cutControl').className='warnbox';N('cutControl').innerHTML='<b>Kontrola detailů: překryv.</b><br>Detaily se nesmí navzájem překrývat. Upravte polohu nebo rozměr označených detailů.'}else if(min<MIN_CUT){N('cutControl').className='warnbox';N('cutControl').innerHTML='<b>Pozor na úzké dořezy.</b><br>Min. dořez: '+mm(min)+'. Zvažte širší lemování překážky nebo optimalizaci posunu.'}else{N('cutControl').className='okbox';N('cutControl').innerHTML='<b>Min. dořez vyhovuje (≥ '+MIN_CUT+' mm).</b><br>Min. dořez: '+(min<999999?mm(min):'bez překážek')}
+ let activeButton=document.activeElement;
+ if(activeButton && activeButton.tagName==='BUTTON' && /přepočítat plán/i.test(activeButton.textContent)){
+  flashActionButton('✓ Přepočítáno');
+ }
 }
 function sx(x,scale,ox){return ox+x*scale} function sy(y,scale,oy,H){return oy+(H-y)*scale}
 
@@ -230,8 +246,8 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
  for(let i=0;i<state.rows.length;i++){let r=i+1, x=(ox + (rw*(i+0.5)/Math.max(1,state.rows.length))); if(x<ox+rw+20){let active=r===state.selectedRow, hov=r===state.hoverRow; let fill=hov?'#e9f8ef':(active?'#0871b9':'#fff'); let stroke=hov?'#16a34a':(active?'#0871b9':'#8190a3'); let color=hov?'#166534':(active?'#fff':'#243447'); s.push(`<g class="row-number ${active?'selected':''} ${hov?'hover':''}" data-row="${r}" onclick="selectRow(${r})" onmouseenter="hoverRow(${r})" onmouseleave="hoverRow(null)" style="cursor:pointer"><circle cx="${x}" cy="${bottomRowsY}" r="12" fill="${fill}" stroke="${stroke}" stroke-width="${active||hov?2:1}"/><text x="${x}" y="${bottomRowsY+4}" text-anchor="middle" font-size="11" font-weight="800" fill="${color}">${r}</text></g>`);}}
  // dimensions roof
  if(N('showDims').checked){dimH(s,ox,oy-40,ox+rw,oy-40,fmt(W),true); dimV(s,ox-64,oy,ox-64,oy+rh,fmt(H),true); const tilePx=TILE_W*scaleX; const colStep=Math.max(3,Math.ceil(82/Math.max(1,tilePx))); for(let x=0;x<=W;x+=TILE_W){let xx=sx(x,scaleX,ox); let col=Math.round(x/TILE_W); let showLabel=(col>0 && (col%colStep===0 || x+TILE_W>W)); s.push(`<line x1="${xx}" x2="${xx}" y1="${oy+rh}" y2="${oy+rh+18}" stroke="#d58b30"/>`); if(showLabel){s.push(`<rect x="${xx-24}" y="${bottomTickY-14}" width="48" height="18" rx="9" fill="#fff" stroke="#e2e8f0"/><text x="${xx}" y="${bottomTickY}" text-anchor="middle" font-size="10" font-weight="800" fill="#64748b">${Math.round(x)}</text>`)} } s.push(`<text x="${ox+rw/2}" y="${bottomAxisY}" text-anchor="middle" font-size="11" font-weight="900" fill="#64748b">Kóta od levého štítu (mm)</text>`); renderTileMeasureLabels(s,scaleX,ox,oy,rw,rh,bottomTickY,bottomAxisY); renderRowMeasureLabels(s,scaleY,ox,oy,rw,rh,H)}
- // Řezané tašky u překážek – kreslí se nejdřív. Samotná překážka je pak překryje,
- // takže uvnitř komínu, okna, vikýře ani prostupu nejsou vidět tašky ani šrafování.
+ // Řezané tašky u překážek: šrafování je pod objekty.
+ // Díky tomu zůstává vidět jen v krytině okolo detailu, nikdy uvnitř něj.
  state.rows.forEach(row=>{
   const tileY=(row.row-1)*TILE_H;
   const tileH=Math.min(TILE_H,H-tileY);
@@ -243,7 +259,8 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
   });
  });
 
- // Překážky jsou vyplněné neprůhledně: uvnitř detailu zůstane pouze jeho ohraničený objekt.
+ // Překážky: neprůhledná bílá výplň skryje tašky i šrafování v jejich půdorysu.
+ // Zůstane pouze čistý, ohraničený objekt.
  let overlapSet=new Set(getOverlapPairs().flat());
  state.obstacles.forEach((o,oi)=>{
   let x=sx(o.x,scaleX,ox), y=sy(o.y+o.h,scaleY,oy,H), w=o.w*scaleX,h=o.h*scaleY;
@@ -252,26 +269,15 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
   let c=hovered?'#16a34a':(selected?'#0871b9':baseColor);
   let sw=hovered?6:(selected?6:5);
   s.push(`<g class="obstacle-shape ${selected?'selected':''} ${hovered?'hover':''}" data-obstacle="${oi}" onpointerdown="selectObstacle(${oi});event.stopPropagation();" onclick="selectObstacle(${oi});event.stopPropagation();" onmouseenter="hoverObstacle(${oi})" onmouseleave="hoverObstacle(null)" style="cursor:pointer">`);
-
   if(o.type==='vikyr'){
     let cx=x+w/2;
-    s.push(`<path d="M${x-120*scaleX},${y+h} L${cx},${y-900*scaleY} L${x+w+120*scaleX},${y+h} Z" fill="#f8fafc" stroke="${c}" stroke-width="${sw}"/>`);
+    s.push(`<path d="M${x-120*scaleX},${y+h} L${cx},${y-900*scaleY} L${x+w+120*scaleX},${y+h} Z" fill="#ffffff" stroke="${c}" stroke-width="${sw}"/>`);
   }
-
-  s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${o.type==='okno'?'#eaf4fb':'#f8fafc'}" stroke="${c}" stroke-width="${sw}"/>`);
-
-  if(o.type==='komin'){
-    s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#hatch)" stroke="none" pointer-events="none"/>`);
-  }
-
-  if(o.type==='prostup'){
-    s.push(`<circle cx="${x+w/2}" cy="${y+h/2}" r="${Math.max(w,h)/2}" fill="#b6dfbf" stroke="${c}" stroke-width="${sw}"/>`);
-  }
-
+  s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffffff" stroke="${c}" stroke-width="${sw}"/>`);
+  if(o.type==='prostup') s.push(`<circle cx="${x+w/2}" cy="${y+h/2}" r="${Math.max(w,h)/2}" fill="#ffffff" stroke="${c}" stroke-width="${sw}"/>`);
   s.push(`<text x="${x+w/2}" y="${y+h/2+5}" text-anchor="middle" font-size="13" font-weight="800" fill="#111" pointer-events="none">${o.name}</text>`);
-  if(overlapSet.has(oi))s.push(`<text x="${x+w/2}" y="${y-10}" text-anchor="middle" font-size="12" font-weight="900" fill="#ed1c24" pointer-events="none">PŘEKRYV</text>`);
+  if(overlapSet.has(oi)) s.push(`<text x="${x+w/2}" y="${y-10}" text-anchor="middle" font-size="12" font-weight="900" fill="#ed1c24" pointer-events="none">PŘEKRYV</text>`);
   s.push(`</g>`);
-
   if(N('showDims').checked){
     dimH(s,ox,y+h/2,x,y+h/2,fmt(o.x),selected||hovered);
     dimV(s,x+w/2,y+h,x+w/2,oy+rh,fmt(o.y),selected||hovered);
@@ -512,57 +518,74 @@ function exportCsv(){let csv='Rada;Kota od okapu;Kota od hrebene;Odsazeni;Kusu;L
 function printPdf(){window.print()}
 
 /* ZPĚTNÁ VAZBA TLAČÍTEK
-   Jediný mechanismus: po dokončení běžného onclick se tlačítko
-   na 1 sekundu zeleně zvýrazní. Nemění text ani neblokuje akci. */
-function bindActionButtonFlash(){
-  const buttons=[
-    ...document.querySelectorAll('button[onclick*="optimize()"], button[onclick*="recalc()"]')
-  ];
+   Zvýraznění se spouští už při stisku myši/prstu (pointerdown),
+   tedy ještě před vlastním synchronním přepočtem. */
+(function bindGreenClickFeedback(){
+  const GREEN_STYLE={
+    'background-color':'#16a34a',
+    'border-color':'#15803d',
+    'color':'#ffffff',
+    'box-shadow':'0 0 0 3px rgba(22,163,74,.30)',
+    'transition':'background-color .10s ease, border-color .10s ease, color .10s ease, box-shadow .10s ease'
+  };
 
-  function flash(button){
-    if(!button)return;
+  function isActionButton(button){
+    if(!button) return false;
+    const handler=button.getAttribute('onclick') || '';
+    return handler.includes('optimize()') || handler.includes('recalc()');
+  }
 
-    if(button._actionFlashTimer){
-      clearTimeout(button._actionFlashTimer);
+  function flashGreen(button){
+    if(!button || !isActionButton(button)) return;
+
+    if(button._greenFlashTimer){
+      window.clearTimeout(button._greenFlashTimer);
     }
 
-    const original={
-      background:button.style.getPropertyValue('background'),
-      backgroundPriority:button.style.getPropertyPriority('background'),
-      backgroundColor:button.style.getPropertyValue('background-color'),
-      backgroundColorPriority:button.style.getPropertyPriority('background-color'),
-      borderColor:button.style.getPropertyValue('border-color'),
-      borderColorPriority:button.style.getPropertyPriority('border-color'),
-      color:button.style.getPropertyValue('color'),
-      colorPriority:button.style.getPropertyPriority('color'),
-      boxShadow:button.style.getPropertyValue('box-shadow'),
-      boxShadowPriority:button.style.getPropertyPriority('box-shadow')
-    };
+    if(!button._greenOriginalStyle){
+      button._greenOriginalStyle={};
+      Object.keys(GREEN_STYLE).forEach(property=>{
+        button._greenOriginalStyle[property]={
+          value:button.style.getPropertyValue(property),
+          priority:button.style.getPropertyPriority(property)
+        };
+      });
+    }
 
-    button.style.setProperty('background','#16a34a','important');
-    button.style.setProperty('background-color','#16a34a','important');
-    button.style.setProperty('border-color','#15803d','important');
-    button.style.setProperty('color','#ffffff','important');
-    button.style.setProperty('box-shadow','0 0 0 3px rgba(22,163,74,.32)','important');
+    Object.entries(GREEN_STYLE).forEach(([property,value])=>{
+      button.style.setProperty(property,value,'important');
+    });
 
-    button._actionFlashTimer=setTimeout(()=>{
-      button.style.setProperty('background',original.background,original.backgroundPriority);
-      button.style.setProperty('background-color',original.backgroundColor,original.backgroundColorPriority);
-      button.style.setProperty('border-color',original.borderColor,original.borderColorPriority);
-      button.style.setProperty('color',original.color,original.colorPriority);
-      button.style.setProperty('box-shadow',original.boxShadow,original.boxShadowPriority);
-      button._actionFlashTimer=null;
+    button._greenFlashTimer=window.setTimeout(()=>{
+      const original=button._greenOriginalStyle || {};
+
+      Object.keys(GREEN_STYLE).forEach(property=>{
+        const item=original[property];
+        if(item && item.value){
+          button.style.setProperty(property,item.value,item.priority || '');
+        }else{
+          button.style.removeProperty(property);
+        }
+      });
+
+      button._greenOriginalStyle=null;
+      button._greenFlashTimer=null;
     },1000);
   }
 
-  buttons.forEach(button=>{
-    button.addEventListener('click',()=>{
-      /* Inline onclick už doběhl; rAF dovolí prohlížeči stav skutečně vykreslit. */
-      requestAnimationFrame(()=>flash(button));
-    });
-  });
-}
+  /* Capture fáze + pointerdown = prohlížeč má možnost stav vykreslit
+     ještě před následným clickem a přepočtem. */
+  document.addEventListener('pointerdown',function(e){
+    const button=e.target && e.target.closest ? e.target.closest('button') : null;
+    flashGreen(button);
+  },true);
 
-optimize();
-recalc();
-bindActionButtonFlash();
+  /* Záloha pro ovládání klávesnicí. */
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Enter' && e.key!==' ') return;
+    const button=document.activeElement;
+    flashGreen(button);
+  },true);
+})();
+
+optimize(); recalc();
