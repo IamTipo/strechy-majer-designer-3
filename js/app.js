@@ -518,40 +518,72 @@ function exportCsv(){let csv='Rada;Kota od okapu;Kota od hrebene;Odsazeni;Kusu;L
 function printPdf(){window.print()}
 
 /* ZPĚTNÁ VAZBA TLAČÍTEK
-   Kliknuté tlačítko se jen vizuálně rozsvítí zeleně na 1 sekundu.
-   Původní onclick zůstává beze změny. */
+   Zvýraznění se spouští už při stisku myši/prstu (pointerdown),
+   tedy ještě před vlastním synchronním přepočtem. */
 (function bindGreenClickFeedback(){
+  const GREEN_STYLE={
+    'background-color':'#16a34a',
+    'border-color':'#15803d',
+    'color':'#ffffff',
+    'box-shadow':'0 0 0 3px rgba(22,163,74,.30)',
+    'transition':'background-color .10s ease, border-color .10s ease, color .10s ease, box-shadow .10s ease'
+  };
+
+  function isActionButton(button){
+    if(!button) return false;
+    const handler=button.getAttribute('onclick') || '';
+    return handler.includes('optimize()') || handler.includes('recalc()');
+  }
+
   function flashGreen(button){
-    if(!button) return;
+    if(!button || !isActionButton(button)) return;
 
     if(button._greenFlashTimer){
       window.clearTimeout(button._greenFlashTimer);
     }
 
-    if(!button.dataset.originalInlineStyle){
-      button.dataset.originalInlineStyle=button.getAttribute('style') || '';
+    if(!button._greenOriginalStyle){
+      button._greenOriginalStyle={};
+      Object.keys(GREEN_STYLE).forEach(property=>{
+        button._greenOriginalStyle[property]={
+          value:button.style.getPropertyValue(property),
+          priority:button.style.getPropertyPriority(property)
+        };
+      });
     }
 
-    button.style.transition='background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease';
-    button.style.backgroundColor='#16a34a';
-    button.style.borderColor='#15803d';
-    button.style.color='#ffffff';
-    button.style.boxShadow='0 0 0 3px rgba(22,163,74,.22)';
+    Object.entries(GREEN_STYLE).forEach(([property,value])=>{
+      button.style.setProperty(property,value,'important');
+    });
 
-    button._greenFlashTimer=window.setTimeout(function(){
-      button.setAttribute('style',button.dataset.originalInlineStyle);
-      delete button.dataset.originalInlineStyle;
+    button._greenFlashTimer=window.setTimeout(()=>{
+      const original=button._greenOriginalStyle || {};
+
+      Object.keys(GREEN_STYLE).forEach(property=>{
+        const item=original[property];
+        if(item && item.value){
+          button.style.setProperty(property,item.value,item.priority || '');
+        }else{
+          button.style.removeProperty(property);
+        }
+      });
+
+      button._greenOriginalStyle=null;
       button._greenFlashTimer=null;
     },1000);
   }
 
-  document.addEventListener('click',function(e){
+  /* Capture fáze + pointerdown = prohlížeč má možnost stav vykreslit
+     ještě před následným clickem a přepočtem. */
+  document.addEventListener('pointerdown',function(e){
     const button=e.target && e.target.closest ? e.target.closest('button') : null;
-    if(!button) return;
+    flashGreen(button);
+  },true);
 
-    const handler=button.getAttribute('onclick') || '';
-    if(handler.indexOf('recalc()')===-1 && handler.indexOf('optimize()')===-1) return;
-
+  /* Záloha pro ovládání klávesnicí. */
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Enter' && e.key!==' ') return;
+    const button=document.activeElement;
     flashGreen(button);
   },true);
 })();
