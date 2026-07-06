@@ -185,7 +185,23 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
  // Proto se osa X a Y škálují samostatně: šířka i výška vždy vyplní pracovní oblast.
  if(!isFinite(scaleX)||scaleX<=0) scaleX=0.05;
  if(!isFinite(scaleY)||scaleY<=0) scaleY=0.05;
- let rw=W*scaleX,rh=H*scaleY, ox=marginL, oy=marginT; let s=[]; s.push(`<defs><filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity=".25"/></filter><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 8 L8 0" stroke="#000" stroke-opacity=".25"/></pattern><pattern id="edgeCutHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" stroke="#b91c1c" stroke-width="3"/></pattern><pattern id="detailCutHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" stroke="#d97706" stroke-width="3"/></pattern></defs>`); s.push(`<rect x="0" y="0" width="${vw}" height="${vh}" fill="#ffffff"/>`);
+ let rw=W*scaleX,rh=H*scaleY, ox=marginL, oy=marginT; let s=[]; s.push(`<defs><filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity=".25"/></filter><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 8 L8 0" stroke="#000" stroke-opacity=".25"/></pattern><pattern id="edgeCutHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" stroke="#b91c1c" stroke-width="3"/></pattern><pattern id="detailCutHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" stroke="#d97706" stroke-width="3"/></pattern></defs>`);
+ // Maska pro šrafování: přes plochu každé překážky se šrafování vůbec nevykreslí.
+ // Nejde jen o překrytí bílou výplní, takže funguje i pro komín s vlastním stylem.
+ let cutMask='<mask id="detailCutMask"><rect x="0" y="0" width="'+vw+'" height="'+vh+'" fill="#fff"/>';
+ state.obstacles.forEach(o=>{
+   const mx=sx(o.x,scaleX,ox), my=sy(o.y+o.h,scaleY,oy,H), mw=o.w*scaleX, mh=o.h*scaleY;
+   if(o.type==='vikyr'){
+     const mcx=mx+mw/2;
+     cutMask+='<path d="M'+(mx-120*scaleX)+','+(my+mh)+' L'+mcx+','+(my-900*scaleY)+' L'+(mx+mw+120*scaleX)+','+(my+mh)+' Z" fill="#000"/>';
+   }
+   cutMask+='<rect x="'+mx+'" y="'+my+'" width="'+mw+'" height="'+mh+'" fill="#000"/>';
+   if(o.type==='prostup'){
+     cutMask+='<circle cx="'+(mx+mw/2)+'" cy="'+(my+mh/2)+'" r="'+(Math.max(mw,mh)/2)+'" fill="#000"/>';
+   }
+ });
+ cutMask+='</mask>';
+ s.push('<defs>'+cutMask+'</defs>'); s.push(`<rect x="0" y="0" width="${vw}" height="${vh}" fill="#ffffff"/>`);
  // roof base
  s.push(`<rect x="${ox}" y="${oy}" width="${rw}" height="${rh}" fill="#e1e5e9" stroke="#30363d" stroke-width="2.2" filter="url(#shadow)"/>`);
  s.push(`<text x="${ox+rw/2}" y="${oy-14}" text-anchor="middle" font-size="17" font-weight="800">HŘEBEN</text><text x="${ox+rw/2}" y="${oy+rh+30}" text-anchor="middle" font-size="17" font-weight="800">OKAP</text>`);
@@ -201,7 +217,7 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
    let roofCut=(!t.full)||(Math.min(TILE_H,H-(row.row-1)*TILE_H)<TILE_H);
    s.push(`<rect x="${x}" y="${yTop}" width="${w}" height="${h}" fill="${t.full?'var(--tile2)':'#f4c6c6'}" stroke="${selTile?'#005bbb':'#77808a'}" stroke-width="${selTile?3:0.8}" opacity=".96" data-tile-row="${row.row}" data-tile-index="${tileNo}" onpointerdown="selectTile(${row.row},${tileNo});event.preventDefault();event.stopPropagation();" onclick="selectTile(${row.row},${tileNo});event.stopPropagation();" onmouseenter="hoverTile(${row.row},${tileNo})" onmouseleave="hoverTile(null,null)" style="cursor:pointer"></rect>`);
    if(roofCut){
-    s.push(`<rect x="${x}" y="${yTop}" width="${w}" height="${h}" fill="url(#edgeCutHatch)" opacity=".42" stroke="#b91c1c" stroke-width="1.6" pointer-events="none"/>`);
+    s.push(`<rect x="${x}" y="${yTop}" width="${w}" height="${h}" fill="url(#edgeCutHatch)" mask="url(#detailCutMask)" opacity=".42" stroke="#b91c1c" stroke-width="1.6" pointer-events="none"/>`);
    }
   });
   s.push(`<rect class="row-hover-overlay" data-row-hover="${row.row}" x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="#16a34a" opacity=".16" stroke="#16a34a" stroke-width="3" pointer-events="none" display="${row.row===state.hoverRow?'block':'none'}"/>`);
@@ -255,7 +271,7 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
    const hit=state.obstacles.some(o=>o.x<t.b&&o.x+o.w>t.a&&o.y<tileY+tileH&&o.y+o.h>tileY);
    if(!hit)return;
    const x=sx(t.a,scaleX,ox), y=sy(tileY+tileH,scaleY,oy,H), w=(t.b-t.a)*scaleX, h=tileH*scaleY;
-   s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#detailCutHatch)" opacity=".38" stroke="#d97706" stroke-width="2.6" stroke-dasharray="7 4" pointer-events="none"/>`);
+   s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#detailCutHatch)" mask="url(#detailCutMask)" opacity=".38" stroke="#d97706" stroke-width="2.6" stroke-dasharray="7 4" pointer-events="none"/>`);
   });
  });
 
@@ -271,10 +287,10 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
   s.push(`<g class="obstacle-shape ${selected?'selected':''} ${hovered?'hover':''}" data-obstacle="${oi}" onpointerdown="selectObstacle(${oi});event.stopPropagation();" onclick="selectObstacle(${oi});event.stopPropagation();" onmouseenter="hoverObstacle(${oi})" onmouseleave="hoverObstacle(null)" style="cursor:pointer">`);
   if(o.type==='vikyr'){
     let cx=x+w/2;
-    s.push(`<path d="M${x-120*scaleX},${y+h} L${cx},${y-900*scaleY} L${x+w+120*scaleX},${y+h} Z" fill="#ffffff" stroke="${c}" stroke-width="${sw}"/>`);
+    s.push(`<path d="M${x-120*scaleX},${y+h} L${cx},${y-900*scaleY} L${x+w+120*scaleX},${y+h} Z" fill="#ffffff" fill-opacity="1" style="fill:#ffffff !important;fill-opacity:1 !important;opacity:1 !important" stroke="${c}" stroke-width="${sw}"/>`);
   }
-  s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffffff" stroke="${c}" stroke-width="${sw}"/>`);
-  if(o.type==='prostup') s.push(`<circle cx="${x+w/2}" cy="${y+h/2}" r="${Math.max(w,h)/2}" fill="#ffffff" stroke="${c}" stroke-width="${sw}"/>`);
+  s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffffff" fill-opacity="1" style="fill:#ffffff !important;fill-opacity:1 !important;opacity:1 !important" stroke="${c}" stroke-width="${sw}"/>`);
+  if(o.type==='prostup') s.push(`<circle cx="${x+w/2}" cy="${y+h/2}" r="${Math.max(w,h)/2}" fill="#ffffff" fill-opacity="1" style="fill:#ffffff !important;fill-opacity:1 !important;opacity:1 !important" stroke="${c}" stroke-width="${sw}"/>`);
   s.push(`<text x="${x+w/2}" y="${y+h/2+5}" text-anchor="middle" font-size="13" font-weight="800" fill="#111" pointer-events="none">${o.name}</text>`);
   if(overlapSet.has(oi)) s.push(`<text x="${x+w/2}" y="${y-10}" text-anchor="middle" font-size="12" font-weight="900" fill="#ed1c24" pointer-events="none">PŘEKRYV</text>`);
   s.push(`</g>`);
