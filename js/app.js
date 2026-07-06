@@ -17,7 +17,8 @@ function analyzeRows(){let {W,H}=getParams(); let rows=Math.ceil(H/TILE_H); let 
 function scoreShift(shift){let old=state.baseShift; state.baseShift=shift; analyzeRows(); let score=0; for(const row of state.rows){if(row.left<MIN_CUT)score+=10000+(MIN_CUT-row.left)*10;if(row.right<MIN_CUT)score+=10000+(MIN_CUT-row.right)*10; score+=Math.abs(row.left-row.right)/20} for(const c of state.cuts){if(!c.ok)score+=5000+(Math.max(0,MIN_CUT-c.left)+Math.max(0,MIN_CUT-c.right))*20} state.baseShift=old; return score}
 function optimize(){let best=0,b=1e99,tested=0; for(let s=0;s<TILE_W;s+=10){let sc=scoreShift(s);tested++; if(sc<b){b=sc;best=s}} state.baseShift=best; N('optInfo').innerHTML='Optimalizace posunu: <b>AKTIVNÍ</b><br>Testováno variant: '+tested+'<br>Vybraný posun: '+mm(best); recalc();}
 function recalc(){let p=getParams(); let slope=N('slopeStatus'); if(p.slope<MIN_SLOPE){slope.className='status bad';slope.textContent='Nevyhovuje – min. sklon PREFA R.16 je 17°';}else{slope.className='status';slope.textContent='Vyhovuje (min. 17°)';} let sep=N('sepStatus'); if(p.slope>=MIN_SLOPE&&p.slope<=SEP_MAX){sep.className='status warn';sep.textContent='Povinná při sklonu 17–25° dle pokynů PREFA';}else if(p.slope<MIN_SLOPE){sep.className='status bad';sep.textContent='Nejdříve ověřit vhodnost krytiny pro daný sklon';}else{sep.className='status';sep.textContent='Běžný rozsah – ověřte dle skladby střechy';}
- analyzeRows(); validateSelectedTile(); validateSelectedObstacle(); renderObstacles(); renderTables(); renderSvg(); updateTileInfo(); updateObstacleInfo(); let area=p.W*p.H/1e6; let tiles=Math.ceil(area*CONS); let obsArea=state.obstacles.reduce((a,o)=>a+o.w*o.h/1e6,0); N('areaSum').textContent=area.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' m²'; N('tileSum').textContent=fmt(tiles)+' ks'; N('wasteSum').textContent=obsArea.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' m²'; N('obsSum').textContent=state.obstacles.length; let min=999999; state.cuts.forEach(c=>{min=Math.min(min,c.left,c.right)}); let overlaps=getOverlapPairs(); if(overlaps.length){N('cutControl').className='warnbox';N('cutControl').innerHTML='<b>Kontrola detailů: překryv.</b><br>Detaily se nesmí navzájem překrývat. Upravte polohu nebo rozměr označených detailů.'}else if(min<MIN_CUT){N('cutControl').className='warnbox';N('cutControl').innerHTML='<b>Pozor na úzké dořezy.</b><br>Min. dořez: '+mm(min)+'. Zvažte širší lemování překážky nebo optimalizaci posunu.'}else{N('cutControl').className='okbox';N('cutControl').innerHTML='<b>Min. dořez vyhovuje (≥ '+MIN_CUT+' mm).</b><br>Min. dořez: '+(min<999999?mm(min):'bez překážek')}}
+ analyzeRows(); validateSelectedTile(); validateSelectedObstacle(); renderObstacles(); renderTables(); renderSvg(); updateTileInfo(); updateObstacleInfo(); let area=p.W*p.H/1e6; let tiles=Math.ceil(area*CONS); let obsArea=state.obstacles.reduce((a,o)=>a+o.w*o.h/1e6,0); N('areaSum').textContent=area.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' m²'; N('tileSum').textContent=fmt(tiles)+' ks'; N('wasteSum').textContent=obsArea.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' m²'; N('obsSum').textContent=state.obstacles.length; let min=999999; state.cuts.forEach(c=>{min=Math.min(min,c.left,c.right)}); let overlaps=getOverlapPairs(); if(overlaps.length){N('cutControl').className='warnbox';N('cutControl').innerHTML='<b>Kontrola detailů: překryv.</b><br>Detaily se nesmí navzájem překrývat. Upravte polohu nebo rozměr označených detailů.'}else if(min<MIN_CUT){N('cutControl').className='warnbox';N('cutControl').innerHTML='<b>Pozor na úzké dořezy.</b><br>Min. dořez: '+mm(min)+'. Zvažte širší lemování překážky nebo optimalizaci posunu.'}else{N('cutControl').className='okbox';N('cutControl').innerHTML='<b>Min. dořez vyhovuje (≥ '+MIN_CUT+' mm).</b><br>Min. dořez: '+(min<999999?mm(min):'bez překážek')}
+}
 function sx(x,scale,ox){return ox+x*scale} function sy(y,scale,oy,H){return oy+(H-y)*scale}
 
 function getTileAt(rowNo,tileIndex){
@@ -168,12 +169,7 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
  // Proto se osa X a Y škálují samostatně: šířka i výška vždy vyplní pracovní oblast.
  if(!isFinite(scaleX)||scaleX<=0) scaleX=0.05;
  if(!isFinite(scaleY)||scaleY<=0) scaleY=0.05;
- let rw=W*scaleX,rh=H*scaleY, ox=marginL, oy=marginT; let s=[]; s.push(`<defs>
-  <filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity=".25"/></filter>
-  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 8 L8 0" stroke="#000" stroke-opacity=".25"/></pattern>
-  <pattern id="edgeCut" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#f4c6c6"/><path d="M-2 8 L8 -2 M2 10 L10 2" stroke="#b42318" stroke-width="1.1" stroke-opacity=".62"/></pattern>
-  <pattern id="detailCut" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#ffe6b0"/><path d="M-2 8 L8 -2 M2 10 L10 2" stroke="#d97706" stroke-width="1.4" stroke-opacity=".78"/></pattern>
-</defs>`); s.push(`<rect x="0" y="0" width="${vw}" height="${vh}" fill="#ffffff"/>`);
+ let rw=W*scaleX,rh=H*scaleY, ox=marginL, oy=marginT; let s=[]; s.push(`<defs><filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity=".25"/></filter><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 8 L8 0" stroke="#000" stroke-opacity=".25"/></pattern><pattern id="edgeCutHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" stroke="#b91c1c" stroke-width="3"/></pattern><pattern id="detailCutHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" stroke="#d97706" stroke-width="3"/></pattern></defs>`); s.push(`<rect x="0" y="0" width="${vw}" height="${vh}" fill="#ffffff"/>`);
  // roof base
  s.push(`<rect x="${ox}" y="${oy}" width="${rw}" height="${rh}" fill="#e1e5e9" stroke="#30363d" stroke-width="2.2" filter="url(#shadow)"/>`);
  s.push(`<text x="${ox+rw/2}" y="${oy-14}" text-anchor="middle" font-size="17" font-weight="800">HŘEBEN</text><text x="${ox+rw/2}" y="${oy+rh+30}" text-anchor="middle" font-size="17" font-weight="800">OKAP</text>`);
@@ -183,18 +179,16 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
   let yTop=sy(Math.min(H,row.row*TILE_H),scaleY,oy,H), yBot=sy((row.row-1)*TILE_H,scaleY,oy,H);
   s.push(`<g class="roof-row ${row.row===state.selectedRow?'selected':''} ${row.row===state.hoverRow?'hover':''}" data-row="${row.row}" onclick="if(!(event.target&&event.target.closest&&event.target.closest('[data-tile-row]'))) selectRow(${row.row})" onmouseenter="hoverRow(${row.row})" onmouseleave="hoverRow(null)" style="cursor:pointer">`);
   row.tiles.forEach((t,idx)=>{
-   let x=sx(t.a,scaleX,ox), w=(t.b-t.a)*scaleX;
+   let x=sx(t.a,scaleX,ox), w=(t.b-t.a)*scaleX, h=yBot-yTop;
    let tileNo=idx+1;
-   let rowH=Math.min(TILE_H,H-(row.row-1)*TILE_H);
-   let edgeCut=t.w<TILE_W-0.001 || rowH<TILE_H-0.001;
-   let tileRect={x:t.a,y:(row.row-1)*TILE_H,w:t.w,h:rowH};
-   let detailCut=state.obstacles.some(o=>rectsOverlap(tileRect,o));
    let selTile=state.selectedTile&&state.selectedTile.row===row.row&&state.selectedTile.index===tileNo;
-   let fill=detailCut?'url(#detailCut)':(edgeCut?'url(#edgeCut)':'var(--tile2)');
-   let stroke=selTile?'#005bbb':(detailCut?'#d97706':(edgeCut?'#b42318':'#77808a'));
-   let strokeWidth=selTile?3:(detailCut||edgeCut?1.35:0.8);
-   s.push(`<rect x="${x}" y="${yTop}" width="${w}" height="${yBot-yTop}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" opacity=".96" data-tile-row="${row.row}" data-tile-index="${tileNo}" onpointerdown="selectTile(${row.row},${tileNo});event.preventDefault();event.stopPropagation();" onclick="selectTile(${row.row},${tileNo});event.stopPropagation();" onmouseenter="hoverTile(${row.row},${tileNo})" onmouseleave="hoverTile(null,null)" style="cursor:pointer"></rect>`);
+   let roofCut=(!t.full)||(Math.min(TILE_H,H-(row.row-1)*TILE_H)<TILE_H);
+   s.push(`<rect x="${x}" y="${yTop}" width="${w}" height="${h}" fill="${t.full?'var(--tile2)':'#f4c6c6'}" stroke="${selTile?'#005bbb':'#77808a'}" stroke-width="${selTile?3:0.8}" opacity=".96" data-tile-row="${row.row}" data-tile-index="${tileNo}" onpointerdown="selectTile(${row.row},${tileNo});event.preventDefault();event.stopPropagation();" onclick="selectTile(${row.row},${tileNo});event.stopPropagation();" onmouseenter="hoverTile(${row.row},${tileNo})" onmouseleave="hoverTile(null,null)" style="cursor:pointer"></rect>`);
+   if(roofCut){
+    s.push(`<rect x="${x}" y="${yTop}" width="${w}" height="${h}" fill="url(#edgeCutHatch)" opacity=".42" stroke="#b91c1c" stroke-width="1.6" pointer-events="none"/>`);
+   }
   });
+  s.push(`<rect class="row-hover-overlay" data-row-hover="${row.row}" x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="#16a34a" opacity=".16" stroke="#16a34a" stroke-width="3" pointer-events="none" display="${row.row===state.hoverRow?'block':'none'}"/>`);
   s.push(`</g>`);
   if(row.row%2===0){let x=sx(row.offset,scaleX,ox); s.push(`<line x1="${x}" x2="${x}" y1="${oy}" y2="${oy+rh}" stroke="#d58b30" stroke-dasharray="8 7" stroke-width="1.3"/>`)}
  }
@@ -202,11 +196,6 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
  if(state.selectedRow){
   let r=state.rows.find(x=>x.row===state.selectedRow);
   if(r){let yTop=sy(Math.min(H,r.row*TILE_H),scaleY,oy,H), yBot=sy((r.row-1)*TILE_H,scaleY,oy,H); s.push(`<rect x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="#0871b9" opacity=".10" pointer-events="none"/><rect x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="none" stroke="#0871b9" stroke-width="4" pointer-events="none"/>`)}
- }
- // dočasné zelené zvýraznění řady pod kurzorem – má přednost vizuálně nad modrým výběrem
- if(state.hoverRow){
-  let r=state.rows.find(x=>x.row===state.hoverRow);
-  if(r){let yTop=sy(Math.min(H,r.row*TILE_H),scaleY,oy,H), yBot=sy((r.row-1)*TILE_H,scaleY,oy,H); s.push(`<rect x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="#16a34a" opacity=".16" pointer-events="none"/><rect x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="none" stroke="#16a34a" stroke-width="3" pointer-events="none"/>`)}
  }
  // vybraná / najetá taška – pouze zvýraznění v grafice, hodnoty jsou v samostatném boxu
  if(state.selectedTile){
@@ -265,7 +254,20 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
     dimH(s,ox,y+h/2,x,y+h/2,fmt(o.x),selected||hovered);
     dimV(s,x+w/2,y+h, x+w/2, oy+rh, fmt(o.y),selected||hovered);
   }
-}); svg.innerHTML=s.join('');}
+});
+ // Řezané tašky u překážek – oranžové šrafování a obrys se kreslí až nad detail,
+ // aby byly jasně viditelné i přes komín, okno, vikýř nebo prostup.
+ state.rows.forEach(row=>{
+  const tileY=(row.row-1)*TILE_H;
+  const tileH=Math.min(TILE_H,H-tileY);
+  row.tiles.forEach(t=>{
+   const hit=state.obstacles.some(o=>o.x<t.b&&o.x+o.w>t.a&&o.y<tileY+tileH&&o.y+o.h>tileY);
+   if(!hit)return;
+   const x=sx(t.a,scaleX,ox), y=sy(tileY+tileH,scaleY,oy,H), w=(t.b-t.a)*scaleX, h=tileH*scaleY;
+   s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#detailCutHatch)" opacity=".38" stroke="#d97706" stroke-width="2.6" stroke-dasharray="7 4" pointer-events="none"/>`);
+  });
+ });
+ svg.innerHTML=s.join('');}
 
 
 function renderTileMeasureLabels(s,scaleX,ox,oy,rw,rh,bottomTickY,bottomAxisY){
@@ -383,7 +385,12 @@ function updateRowVisualState(){
  });
 }
 function hoverRow(r){
- state.hoverRow=r==null?null:Number(r);
+ const next=r==null?null:Number(r);
+ if(state.hoverRow===next)return;
+ state.hoverRow=next;
+ document.querySelectorAll('[data-row-hover]').forEach(el=>{
+  el.setAttribute('display',Number(el.dataset.rowHover)===next?'block':'none');
+ });
  updateRowVisualState();
 }
 function selectRow(r,clearTile=true){
@@ -406,25 +413,24 @@ function setTab(t){N('rowsPanel').style.display=t==='rows'?'block':'none';N('cut
 function renderObstacles(){let el=N('obstacleList');el.innerHTML=''; let overlapSet=new Set(getOverlapPairs().flat()); state.obstacles.forEach((o,i)=>{let d=document.createElement('div');d.className='obsItem'+(overlapSet.has(i)?' overlap':'');d.innerHTML=`<span class="swatch" style="background:${colors[o.type]}"></span><div><b>${o.name}</b><span>${o.w} × ${o.h} mm &nbsp; X:${o.x} Y:${o.y}</span></div><button class="small" onclick="editObstacle(${i})">✎</button><button class="small danger" onclick="delObstacle(${i})">×</button>`;el.appendChild(d)})}
 function showHelp(){N('helpModal').classList.add('show')}
 function hideHelp(){N('helpModal').classList.remove('show')}
-
-/* Překážky: při otevření modalu se vždy zruší pouze dočasné najetí myší.
-   Vybraná řada zůstává vybraná, ale po návratu už nezůstane zeleně „viset“. */
-function clearObstacleHoverState(){
+function clearObstacleInteraction(){
+ state.editing=null;
+ state.selectedRow=null;
  state.hoverRow=null;
+ state.selectedTile=null;
  state.hoverTile=null;
+ state.tileClickLock=0;
+ state.selectedObstacle=null;
  state.hoverObstacle=null;
 }
-
 function showObstacle(i=null){
- const editIndex=Number.isInteger(i)?i:null;
- const o=editIndex===null
-  ?{name:'Komín',type:'komin',x:1000,y:1000,w:800,h:800}
-  :state.obstacles[editIndex];
-
- if(!o)return;
-
- state.editing=editIndex;
- clearObstacleHoverState();
+ state.editing=i==null?null:Number(i);
+ state.hoverRow=null;
+ state.hoverTile=null;
+ document.querySelectorAll('[data-row-hover]').forEach(el=>el.setAttribute('display','none'));
+ updateRowVisualState();
+ let o=state.editing==null?{name:'Komín',type:'komin',x:1000,y:1000,w:800,h:800}:state.obstacles[state.editing];
+ if(!o){clearObstacleInteraction();return;}
  N('obsName').value=o.name;
  N('obsType').value=o.type;
  N('obsX').value=o.x;
@@ -432,40 +438,24 @@ function showObstacle(i=null){
  N('obsW').value=o.w;
  N('obsH').value=o.h;
  N('modal').classList.add('show');
- renderTables();
- renderSvg();
 }
-
 function hideObstacle(){
  N('modal').classList.remove('show');
- state.editing=null;
- clearObstacleHoverState();
- renderTables();
- renderSvg();
- updateTileInfo();
- updateObstacleInfo();
+ clearObstacleInteraction();
+ recalc();
 }
-
-function editObstacle(i){
- showObstacle(Number(i));
-}
-
+function editObstacle(i){showObstacle(Number(i))}
 function delObstacle(i){
  const index=Number(i);
  if(!Number.isInteger(index)||index<0||index>=state.obstacles.length)return;
  state.obstacles.splice(index,1);
- state.editing=null;
- state.selectedObstacle=null;
- clearObstacleHoverState();
+ clearObstacleInteraction();
  recalc();
 }
-
 function saveObstacle(){
- const editingIndex=Number.isInteger(state.editing)?state.editing:null;
- const o={
-  id:editingIndex!==null&&state.obstacles[editingIndex]
-   ?state.obstacles[editingIndex].id
-   :Date.now(),
+ const editIndex=state.editing;
+ let o={
+  id:Number.isInteger(editIndex)&&state.obstacles[editIndex]?state.obstacles[editIndex].id:Date.now(),
   name:N('obsName').value.trim()||'Překážka',
   type:N('obsType').value,
   x:val('obsX'),
@@ -473,34 +463,15 @@ function saveObstacle(){
   w:val('obsW'),
   h:val('obsH')
  };
-
- if(o.w<=0||o.h<=0){
-  alert('Detail musí mít kladnou šířku i výšku.');
-  return;
- }
-
- const p=getParams();
- if(o.x<0||o.y<0||o.x+o.w>p.W||o.y+o.h>p.H){
-  alert('Detail musí být celý uvnitř střešní roviny.');
-  return;
- }
-
- const overlap=findObstacleOverlap(o,editingIndex);
- if(overlap){
-  alert('Detail se překrývá s položkou „'+overlap.obstacle.name+'“. Upravte polohu nebo rozměr – detaily se nesmí navzájem překrývat.');
-  return;
- }
-
- if(editingIndex===null){
-  state.obstacles.push(o);
- }else{
-  state.obstacles[editingIndex]=o;
- }
-
+ if(o.w<=0||o.h<=0){alert('Detail musí mít kladnou šířku i výšku.');return;}
+ let p=getParams();
+ if(o.x<0||o.y<0||o.x+o.w>p.W||o.y+o.h>p.H){alert('Detail musí být celý uvnitř střešní roviny.');return;}
+ let overlap=findObstacleOverlap(o,Number.isInteger(editIndex)?editIndex:null);
+ if(overlap){alert('Detail se překrývá s položkou „'+overlap.obstacle.name+'“. Upravte polohu nebo rozměr – detaily se nesmí navzájem překrývat.');return;}
+ if(Number.isInteger(editIndex)&&editIndex>=0&&editIndex<state.obstacles.length)state.obstacles[editIndex]=o;
+ else state.obstacles.push(o);
  N('modal').classList.remove('show');
- state.editing=null;
- state.selectedObstacle=null;
- clearObstacleHoverState();
+ clearObstacleInteraction();
  recalc();
 }
 function newProject(){if(confirm('Smazat aktuální projekt?')){state.baseShift=0;state.selectedRow=null;state.hoverRow=null;state.selectedTile=null;state.hoverTile=null;state.selectedObstacle=null;state.hoverObstacle=null;state.obstacles=[];recalc()}}
@@ -529,4 +500,104 @@ N('planSvg').addEventListener('pointerdown',handlePlanPick,true);
 N('planSvg').addEventListener('click',handlePlanPick,true);
 function exportCsv(){let csv='Rada;Kota od okapu;Kota od hrebene;Odsazeni;Kusu;Levy kraj;Pravy kraj\n'+state.rows.map(r=>[r.row,Math.round(r.measureOkap),Math.round(r.measureHreben),Math.round(r.offset),r.full,Math.round(r.left),Math.round(r.right)].join(';')).join('\n'); let blob=new Blob([csv],{type:'text/csv;charset=utf-8'}); let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rozpis_rad_prefa_r16.csv';a.click()}
 function printPdf(){window.print()}
+
+/* VIZUÁLNÍ POTVRZENÍ TLAČÍTEK PŘEPOČTU A OPTIMALIZACE
+   Zachytíme kliknutí dříve, než proběhne inline onclick, aby prohlížeč
+   skutečně stihl zobrazit stav „pracuji“. */
+(function bindActionFeedback(){
+ function getActionButton(target){
+  const b=target && target.closest ? target.closest('button') : null;
+  if(!b) return null;
+  const handler=b.getAttribute('onclick') || '';
+  if(handler.indexOf('optimize()')>-1) return {button:b,action:'optimize'};
+  if(handler.indexOf('recalc()')>-1) return {button:b,action:'recalc'};
+  return null;
+ }
+ function runWithFeedback(button,action){
+  if(button.dataset.busy==='1') return;
+  const original=button.textContent;
+  button.dataset.busy='1';
+  button.disabled=true;
+  button.textContent=action==='optimize'?'Optimalizuji…':'Přepočítávám…';
+  requestAnimationFrame(()=>{
+   requestAnimationFrame(()=>{
+    try{
+     if(action==='optimize') optimize(); else recalc();
+     button.textContent=action==='optimize'?'✓ Optimalizováno':'✓ Přepočítáno';
+    }catch(err){
+     console.error(err);
+     button.textContent='✕ Chyba';
+    }
+    window.setTimeout(()=>{
+     button.textContent=original;
+     button.disabled=false;
+     button.dataset.busy='0';
+    },1200);
+   });
+  });
+ }
+ document.addEventListener('click',function(e){
+  const found=getActionButton(e.target);
+  if(!found) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  runWithFeedback(found.button,found.action);
+ },true);
+})();
+
+
+
+/* ZPĚTNÁ VAZBA PO KLIKNUTÍ – PLovoucí potvrzení nad výkresem */
+(function bindActionToast(){
+ let busy=false;
+ function actionOf(target){
+  const button=target && target.closest ? target.closest('button') : null;
+  if(!button) return null;
+  const handler=button.getAttribute('onclick') || '';
+  if(handler.indexOf('optimize()')>-1) return {button,kind:'optimize'};
+  if(handler.indexOf('recalc()')>-1) return {button,kind:'recalc'};
+  return null;
+ }
+ function toast(message){
+  let el=document.getElementById('actionToast');
+  if(!el){
+   el=document.createElement('div');
+   el.id='actionToast';
+   el.style.cssText='position:fixed;left:50%;top:86px;transform:translate(-50%,-12px);z-index:9999;padding:12px 18px;border-radius:10px;background:#166534;color:#fff;font:700 14px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.22);opacity:0;pointer-events:none;transition:opacity .16s ease,transform .16s ease;';
+   document.body.appendChild(el);
+  }
+  el.textContent=message;
+  el.style.opacity='1';
+  el.style.transform='translate(-50%,0)';
+  clearTimeout(el._hideTimer);
+  el._hideTimer=setTimeout(()=>{
+   el.style.opacity='0';
+   el.style.transform='translate(-50%,-12px)';
+  },1400);
+ }
+ document.addEventListener('click',function(e){
+  const found=actionOf(e.target);
+  if(!found || busy) return;
+  busy=true;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  toast(found.kind==='optimize'?'Optimalizuji posun…':'Přepočítávám plán…');
+  window.setTimeout(()=>{
+   try{
+    if(found.kind==='optimize'){
+     optimize();
+     toast('✓ Posun optimalizován');
+    }else{
+     recalc();
+     toast('✓ Plán přepočítán');
+    }
+   }catch(err){
+    console.error(err);
+    toast('✕ Akci se nepodařilo dokončit');
+   }
+   busy=false;
+  },120);
+ },true);
+})();
+
 optimize(); recalc();
