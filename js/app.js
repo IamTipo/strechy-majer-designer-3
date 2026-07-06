@@ -246,33 +246,8 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
  for(let i=0;i<state.rows.length;i++){let r=i+1, x=(ox + (rw*(i+0.5)/Math.max(1,state.rows.length))); if(x<ox+rw+20){let active=r===state.selectedRow, hov=r===state.hoverRow; let fill=hov?'#e9f8ef':(active?'#0871b9':'#fff'); let stroke=hov?'#16a34a':(active?'#0871b9':'#8190a3'); let color=hov?'#166534':(active?'#fff':'#243447'); s.push(`<g class="row-number ${active?'selected':''} ${hov?'hover':''}" data-row="${r}" onclick="selectRow(${r})" onmouseenter="hoverRow(${r})" onmouseleave="hoverRow(null)" style="cursor:pointer"><circle cx="${x}" cy="${bottomRowsY}" r="12" fill="${fill}" stroke="${stroke}" stroke-width="${active||hov?2:1}"/><text x="${x}" y="${bottomRowsY+4}" text-anchor="middle" font-size="11" font-weight="800" fill="${color}">${r}</text></g>`);}}
  // dimensions roof
  if(N('showDims').checked){dimH(s,ox,oy-40,ox+rw,oy-40,fmt(W),true); dimV(s,ox-64,oy,ox-64,oy+rh,fmt(H),true); const tilePx=TILE_W*scaleX; const colStep=Math.max(3,Math.ceil(82/Math.max(1,tilePx))); for(let x=0;x<=W;x+=TILE_W){let xx=sx(x,scaleX,ox); let col=Math.round(x/TILE_W); let showLabel=(col>0 && (col%colStep===0 || x+TILE_W>W)); s.push(`<line x1="${xx}" x2="${xx}" y1="${oy+rh}" y2="${oy+rh+18}" stroke="#d58b30"/>`); if(showLabel){s.push(`<rect x="${xx-24}" y="${bottomTickY-14}" width="48" height="18" rx="9" fill="#fff" stroke="#e2e8f0"/><text x="${xx}" y="${bottomTickY}" text-anchor="middle" font-size="10" font-weight="800" fill="#64748b">${Math.round(x)}</text>`)} } s.push(`<text x="${ox+rw/2}" y="${bottomAxisY}" text-anchor="middle" font-size="11" font-weight="900" fill="#64748b">Kóta od levého štítu (mm)</text>`); renderTileMeasureLabels(s,scaleX,ox,oy,rw,rh,bottomTickY,bottomAxisY); renderRowMeasureLabels(s,scaleY,ox,oy,rw,rh,H)}
- // obstacles and dims
- let overlapSet=new Set(getOverlapPairs().flat());
- state.obstacles.forEach((o,oi)=>{
-  let x=sx(o.x,scaleX,ox), y=sy(o.y+o.h,scaleY,oy,H), w=o.w*scaleX,h=o.h*scaleY;
-  let selected=state.selectedObstacle===oi, hovered=state.hoverObstacle===oi;
-  let baseColor=overlapSet.has(oi)?'#ed1c24':(colors[o.type]||'#555');
-  let c=hovered?'#16a34a':(selected?'#0871b9':baseColor);
-  let sw=hovered?6:(selected?6:5);
-  s.push(`<g class="obstacle-shape ${selected?'selected':''} ${hovered?'hover':''}" data-obstacle="${oi}" onpointerdown="selectObstacle(${oi});event.stopPropagation();" onclick="selectObstacle(${oi});event.stopPropagation();" onmouseenter="hoverObstacle(${oi})" onmouseleave="hoverObstacle(null)" style="cursor:pointer">`);
-  if(o.type==='vikyr'){
-    let cx=x+w/2;
-    s.push(`<path d="M${x-120*scaleX},${y+h} L${cx},${y-900*scaleY} L${x+w+120*scaleX},${y+h} Z" fill="#ffffff66" stroke="${c}" stroke-width="${sw}"/>`)
-  }
-  s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${o.type==='komin'?'url(#hatch)':'#eaf4fb'}" stroke="${c}" stroke-width="${sw}"/>`);
-  if(o.type==='prostup') s.push(`<circle cx="${x+w/2}" cy="${y+h/2}" r="${Math.max(w,h)/2}" fill="#b6dfbf" stroke="${c}" stroke-width="${sw}"/>`);
-  s.push(`<text x="${x+w/2}" y="${y+h/2+5}" text-anchor="middle" font-size="13" font-weight="800" fill="#111" pointer-events="none">${o.name}</text>`);
-  if(overlapSet.has(oi)) s.push(`<text x="${x+w/2}" y="${y-10}" text-anchor="middle" font-size="12" font-weight="900" fill="#ed1c24" pointer-events="none">PŘEKRYV</text>`);
-  s.push(`</g>`);
-  if(N('showDims').checked){
-    // U detailů necháváme pouze dvě základní kontrolní kóty:
-    // od levého štítu a od okapní hrany. Ostatní hodnoty jsou v informační buňce vpravo.
-    dimH(s,ox,y+h/2,x,y+h/2,fmt(o.x),selected||hovered);
-    dimV(s,x+w/2,y+h, x+w/2, oy+rh, fmt(o.y),selected||hovered);
-  }
-});
- // Řezané tašky u překážek – oranžové šrafování a obrys se kreslí až nad detail,
- // aby byly jasně viditelné i přes komín, okno, vikýř nebo prostup.
+ // Řezané tašky u překážek – kreslí se nejdřív. Samotná překážka je pak překryje,
+ // takže uvnitř komínu, okna, vikýře ani prostupu nejsou vidět tašky ani šrafování.
  state.rows.forEach(row=>{
   const tileY=(row.row-1)*TILE_H;
   const tileH=Math.min(TILE_H,H-tileY);
@@ -282,6 +257,41 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
    const x=sx(t.a,scaleX,ox), y=sy(tileY+tileH,scaleY,oy,H), w=(t.b-t.a)*scaleX, h=tileH*scaleY;
    s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#detailCutHatch)" opacity=".38" stroke="#d97706" stroke-width="2.6" stroke-dasharray="7 4" pointer-events="none"/>`);
   });
+ });
+
+ // Překážky jsou vyplněné neprůhledně: uvnitř detailu zůstane pouze jeho ohraničený objekt.
+ let overlapSet=new Set(getOverlapPairs().flat());
+ state.obstacles.forEach((o,oi)=>{
+  let x=sx(o.x,scaleX,ox), y=sy(o.y+o.h,scaleY,oy,H), w=o.w*scaleX,h=o.h*scaleY;
+  let selected=state.selectedObstacle===oi, hovered=state.hoverObstacle===oi;
+  let baseColor=overlapSet.has(oi)?'#ed1c24':(colors[o.type]||'#555');
+  let c=hovered?'#16a34a':(selected?'#0871b9':baseColor);
+  let sw=hovered?6:(selected?6:5);
+  s.push(`<g class="obstacle-shape ${selected?'selected':''} ${hovered?'hover':''}" data-obstacle="${oi}" onpointerdown="selectObstacle(${oi});event.stopPropagation();" onclick="selectObstacle(${oi});event.stopPropagation();" onmouseenter="hoverObstacle(${oi})" onmouseleave="hoverObstacle(null)" style="cursor:pointer">`);
+
+  if(o.type==='vikyr'){
+    let cx=x+w/2;
+    s.push(`<path d="M${x-120*scaleX},${y+h} L${cx},${y-900*scaleY} L${x+w+120*scaleX},${y+h} Z" fill="#f8fafc" stroke="${c}" stroke-width="${sw}"/>`);
+  }
+
+  s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${o.type==='okno'?'#eaf4fb':'#f8fafc'}" stroke="${c}" stroke-width="${sw}"/>`);
+
+  if(o.type==='komin'){
+    s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#hatch)" stroke="none" pointer-events="none"/>`);
+  }
+
+  if(o.type==='prostup'){
+    s.push(`<circle cx="${x+w/2}" cy="${y+h/2}" r="${Math.max(w,h)/2}" fill="#b6dfbf" stroke="${c}" stroke-width="${sw}"/>`);
+  }
+
+  s.push(`<text x="${x+w/2}" y="${y+h/2+5}" text-anchor="middle" font-size="13" font-weight="800" fill="#111" pointer-events="none">${o.name}</text>`);
+  if(overlapSet.has(oi))s.push(`<text x="${x+w/2}" y="${y-10}" text-anchor="middle" font-size="12" font-weight="900" fill="#ed1c24" pointer-events="none">PŘEKRYV</text>`);
+  s.push(`</g>`);
+
+  if(N('showDims').checked){
+    dimH(s,ox,y+h/2,x,y+h/2,fmt(o.x),selected||hovered);
+    dimV(s,x+w/2,y+h,x+w/2,oy+rh,fmt(o.y),selected||hovered);
+  }
  });
  svg.innerHTML=s.join('');}
 
