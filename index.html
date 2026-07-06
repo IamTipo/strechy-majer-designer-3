@@ -8,7 +8,100 @@
   <link rel="apple-touch-icon" href="images/favicon.png">
   <link rel="icon" type="image/png" sizes="512x512" href="images/favicon-512.png">
 </head>
-<body>
+<script>
+
+/* Oprava stavu překážek po editaci */
+
+(function () {
+
+  const puvodniRender = window.renderAll || window.render || null;
+
+  function resetStavuPoEditaci() {
+
+    try {
+
+      if (typeof window.editingObstacleIndex !== "undefined") {
+
+        window.editingObstacleIndex = null;
+
+      }
+
+      if (typeof window.selectedObstacleIndex !== "undefined") {
+
+        window.selectedObstacleIndex = null;
+
+      }
+
+      if (typeof window.selectedRowIndex !== "undefined") {
+
+        window.selectedRowIndex = null;
+
+      }
+
+      if (typeof window.selectedTileIndex !== "undefined") {
+
+        window.selectedTileIndex = null;
+
+      }
+
+      if (typeof window.renderAll === "function") {
+
+        window.renderAll();
+
+      } else if (typeof window.render === "function") {
+
+        window.render();
+
+      }
+
+      if (typeof window.updateTables === "function") {
+
+        window.updateTables();
+
+      }
+
+      if (typeof window.drawLayout === "function") {
+
+        window.drawLayout();
+
+      }
+
+    } catch (e) {
+
+      console.warn("Oprava překážek:", e);
+
+    }
+
+  }
+
+  document.addEventListener("click", function (e) {
+
+    const text = (e.target.innerText || e.target.textContent || "").trim().toLowerCase();
+
+    if (
+
+      text === "uložit" ||
+
+      text === "uložit překážku" ||
+
+      text === "potvrdit" ||
+
+      text === "přidat překážku"
+
+    ) {
+
+      setTimeout(resetStavuPoEditaci, 100);
+
+    }
+
+  });
+
+  window.resetStavuPoEditaci = resetStavuPoEditaci;
+
+})();
+
+</script>
+  <body>
 <div class="topbar"><div class="logoBox"><a class="logoLink" href="https://www.strechymajer.cz" target="_blank" rel="noopener noreferrer" title="Otevřít www.strechymajer.cz"><img src="images/logo.png" alt="STŘECHY MAJER"></a></div><div class="appTitle"><b>STŘECHY MAJER Designer 3.0-dev</b><span>Kladečský plán PREFA R.16</span></div><div class="projectMeta"><b id="topProject">Demo projekt</b><span>PREFA R.16 · <span class="saveState">● Uloženo</span></span></div><div class="nav"><button onclick="newProject()">＋ NOVÝ</button><button onclick="openProject()">▢ OTEVŘÍT</button><button onclick="saveProject()">💾 ULOŽIT</button><button onclick="printPdf()">PDF</button><button onclick="exportCsv()">CSV</button><button onclick="window.print()">TISK</button></div><button onclick="showHelp()">? NÁPOVĚDA</button><div class="version">v3.0-dev</div></div>
 <div class="app">
 <aside class="side">
