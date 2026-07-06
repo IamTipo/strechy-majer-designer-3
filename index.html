@@ -8,99 +8,6 @@
   <link rel="apple-touch-icon" href="images/favicon.png">
   <link rel="icon" type="image/png" sizes="512x512" href="images/favicon-512.png">
 </head>
-<script>
-
-/* Oprava stavu překážek po editaci */
-
-(function () {
-
-  const puvodniRender = window.renderAll || window.render || null;
-
-  function resetStavuPoEditaci() {
-
-    try {
-
-      if (typeof window.editingObstacleIndex !== "undefined") {
-
-        window.editingObstacleIndex = null;
-
-      }
-
-      if (typeof window.selectedObstacleIndex !== "undefined") {
-
-        window.selectedObstacleIndex = null;
-
-      }
-
-      if (typeof window.selectedRowIndex !== "undefined") {
-
-        window.selectedRowIndex = null;
-
-      }
-
-      if (typeof window.selectedTileIndex !== "undefined") {
-
-        window.selectedTileIndex = null;
-
-      }
-
-      if (typeof window.renderAll === "function") {
-
-        window.renderAll();
-
-      } else if (typeof window.render === "function") {
-
-        window.render();
-
-      }
-
-      if (typeof window.updateTables === "function") {
-
-        window.updateTables();
-
-      }
-
-      if (typeof window.drawLayout === "function") {
-
-        window.drawLayout();
-
-      }
-
-    } catch (e) {
-
-      console.warn("Oprava překážek:", e);
-
-    }
-
-  }
-
-  document.addEventListener("click", function (e) {
-
-    const text = (e.target.innerText || e.target.textContent || "").trim().toLowerCase();
-
-    if (
-
-      text === "uložit" ||
-
-      text === "uložit překážku" ||
-
-      text === "potvrdit" ||
-
-      text === "přidat překážku"
-
-    ) {
-
-      setTimeout(resetStavuPoEditaci, 100);
-
-    }
-
-  });
-
-  window.resetStavuPoEditaci = resetStavuPoEditaci;
-
-})();
-
-</script>
   <body>
 <div class="topbar"><div class="logoBox"><a class="logoLink" href="https://www.strechymajer.cz" target="_blank" rel="noopener noreferrer" title="Otevřít www.strechymajer.cz"><img src="images/logo.png" alt="STŘECHY MAJER"></a></div><div class="appTitle"><b>STŘECHY MAJER Designer 3.0-dev</b><span>Kladečský plán PREFA R.16</span></div><div class="projectMeta"><b id="topProject">Demo projekt</b><span>PREFA R.16 · <span class="saveState">● Uloženo</span></span></div><div class="nav"><button onclick="newProject()">＋ NOVÝ</button><button onclick="openProject()">▢ OTEVŘÍT</button><button onclick="saveProject()">💾 ULOŽIT</button><button onclick="printPdf()">PDF</button><button onclick="exportCsv()">CSV</button><button onclick="window.print()">TISK</button></div><button onclick="showHelp()">? NÁPOVĚDA</button><div class="version">v3.0-dev</div></div>
 <div class="app">
@@ -203,4 +110,165 @@
 </div><div class="dialogActions"><button onclick="hideObstacle()">Zrušit</button><button class="primary" onclick="saveObstacle()">Uložit</button></div></div></div>
 <input id="fileOpen" type="file" accept=".smr16,application/json" style="display:none">
 <script src="js/app.js"></script>
-</body></html>
+
+<script>
+
+/* OPRAVA EDITACE PŘEKÁŽEK
+
+   Tento blok musí být až ZA načtením js/app.js. */
+
+(function () {
+
+  function getInputNumber(id) {
+
+    return Number(document.getElementById(id).value);
+
+  }
+
+  function clearObstacleState() {
+
+    if (!window.state) return;
+
+    state.editing = null;
+
+    state.selectedRow = null;
+
+    state.hoverRow = null;
+
+    state.selectedTile = null;
+
+    state.hoverTile = null;
+
+    state.selectedObstacle = null;
+
+    state.hoverObstacle = null;
+
+  }
+
+  window.hideObstacle = function () {
+
+    document.getElementById('modal').classList.remove('show');
+
+    clearObstacleState();
+
+    if (typeof window.recalc === 'function') {
+
+      window.recalc();
+
+    }
+
+  };
+
+  window.saveObstacle = function () {
+
+    if (!window.state || !Array.isArray(state.obstacles)) {
+
+      alert('Nepodařilo se načíst data překážek.');
+
+      return;
+
+    }
+
+    const editIndex = state.editing;
+
+    const obstacle = {
+
+      id: Number.isInteger(editIndex) && state.obstacles[editIndex]
+
+        ? state.obstacles[editIndex].id
+
+        : Date.now(),
+
+      name: document.getElementById('obsName').value.trim() || 'Překážka',
+
+      type: document.getElementById('obsType').value,
+
+      x: getInputNumber('obsX'),
+
+      y: getInputNumber('obsY'),
+
+      w: getInputNumber('obsW'),
+
+      h: getInputNumber('obsH')
+
+    };
+
+    if (
+
+      !Number.isFinite(obstacle.x) ||
+
+      !Number.isFinite(obstacle.y) ||
+
+      !Number.isFinite(obstacle.w) ||
+
+      !Number.isFinite(obstacle.h) ||
+
+      obstacle.w <= 0 ||
+
+      obstacle.h <= 0
+
+    ) {
+
+      alert('Zadejte platnou polohu a kladné rozměry překážky.');
+
+      return;
+
+    }
+
+    /*
+
+      Důležité:
+
+      Kontrolujeme index i tehdy, když je 0.
+
+      První překážka má index 0 a starý zápis ji mohl
+
+      chybně vyhodnotit jako „needitovanou“.
+
+    */
+
+    if (Number.isInteger(editIndex) && editIndex >= 0) {
+
+      state.obstacles[editIndex] = obstacle;
+
+    } else {
+
+      state.obstacles.push(obstacle);
+
+    }
+
+    document.getElementById('modal').classList.remove('show');
+
+    clearObstacleState();
+
+    if (typeof window.recalc === 'function') {
+
+      window.recalc();
+
+    }
+
+  };
+
+  window.delObstacle = function (index) {
+
+    if (!window.state || !Array.isArray(state.obstacles)) return;
+
+    state.obstacles.splice(index, 1);
+
+    clearObstacleState();
+
+    if (typeof window.recalc === 'function') {
+
+      window.recalc();
+
+    }
+
+  };
+
+})();
+
+</script>
+
+</body>
+
+</html>
