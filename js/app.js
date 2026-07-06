@@ -15,9 +15,25 @@ function rowTiles(W,r){let off=rowOffset(r), arr=[]; let first=Math.floor((-off)
 function analyzeRows(){let {W,H}=getParams(); let rows=Math.ceil(H/TILE_H); let out=[],cuts=[]; for(let r=1;r<=rows;r++){let tiles=rowTiles(W,r); let full=tiles.filter(t=>t.full).length; let left=tiles[0]?.w||0, right=tiles[tiles.length-1]?.w||0; let y0=(r-1)*TILE_H,y1=Math.min(H,r*TILE_H); let note=(r%2===0?'1/2 na začátku':'Celá taška'); if(left<MIN_CUT||right<MIN_CUT) note+=' – úzký kraj'; for(const o of state.obstacles){if(o.y<y1 && o.y+o.h>y0){let lt=tiles.find(t=>t.a<=o.x && t.b>o.x), rt=tiles.find(t=>t.a<o.x+o.w && t.b>=o.x+o.w); let lc=lt?o.x-lt.a:0, rc=rt?rt.b-(o.x+o.w):0; let ok=lc>=MIN_CUT&&rc>=MIN_CUT; cuts.push({row:r,obs:o.name,left:lc,right:rc,ok}); if(!ok) note+=' – řešit lemování/posun';}}
  out.push({row:r,measureOkap:Math.min(H,r*TILE_H),measureHreben:Math.max(0,H-Math.min(H,r*TILE_H)),offset:rowOffset(r),tiles,full,left,right,note,bad:left<MIN_CUT||right<MIN_CUT})} state.rows=out; state.cuts=cuts;}
 function scoreShift(shift){let old=state.baseShift; state.baseShift=shift; analyzeRows(); let score=0; for(const row of state.rows){if(row.left<MIN_CUT)score+=10000+(MIN_CUT-row.left)*10;if(row.right<MIN_CUT)score+=10000+(MIN_CUT-row.right)*10; score+=Math.abs(row.left-row.right)/20} for(const c of state.cuts){if(!c.ok)score+=5000+(Math.max(0,MIN_CUT-c.left)+Math.max(0,MIN_CUT-c.right))*20} state.baseShift=old; return score}
-function optimize(){let best=0,b=1e99,tested=0; for(let s=0;s<TILE_W;s+=10){let sc=scoreShift(s);tested++; if(sc<b){b=sc;best=s}} state.baseShift=best; N('optInfo').innerHTML='Optimalizace posunu: <b>AKTIVNÍ</b><br>Testováno variant: '+tested+'<br>Vybraný posun: '+mm(best); recalc();}
+function flashActionButton(doneText){
+ const button=document.activeElement;
+ if(!button || button.tagName!=='BUTTON') return;
+ const original=button.dataset.originalLabel || button.textContent;
+ button.dataset.originalLabel=original;
+ button.textContent=doneText;
+ button.disabled=true;
+ window.setTimeout(()=>{
+  button.textContent=original;
+  button.disabled=false;
+ },1100);
+}
+function optimize(){let best=0,b=1e99,tested=0; for(let s=0;s<TILE_W;s+=10){let sc=scoreShift(s);tested++; if(sc<b){b=sc;best=s}} state.baseShift=best; N('optInfo').innerHTML='Optimalizace posunu: <b>AKTIVNÍ</b><br>Testováno variant: '+tested+'<br>Vybraný posun: '+mm(best); recalc(); flashActionButton('✓ Optimalizováno');}
 function recalc(){let p=getParams(); let slope=N('slopeStatus'); if(p.slope<MIN_SLOPE){slope.className='status bad';slope.textContent='Nevyhovuje – min. sklon PREFA R.16 je 17°';}else{slope.className='status';slope.textContent='Vyhovuje (min. 17°)';} let sep=N('sepStatus'); if(p.slope>=MIN_SLOPE&&p.slope<=SEP_MAX){sep.className='status warn';sep.textContent='Povinná při sklonu 17–25° dle pokynů PREFA';}else if(p.slope<MIN_SLOPE){sep.className='status bad';sep.textContent='Nejdříve ověřit vhodnost krytiny pro daný sklon';}else{sep.className='status';sep.textContent='Běžný rozsah – ověřte dle skladby střechy';}
  analyzeRows(); validateSelectedTile(); validateSelectedObstacle(); renderObstacles(); renderTables(); renderSvg(); updateTileInfo(); updateObstacleInfo(); let area=p.W*p.H/1e6; let tiles=Math.ceil(area*CONS); let obsArea=state.obstacles.reduce((a,o)=>a+o.w*o.h/1e6,0); N('areaSum').textContent=area.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' m²'; N('tileSum').textContent=fmt(tiles)+' ks'; N('wasteSum').textContent=obsArea.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' m²'; N('obsSum').textContent=state.obstacles.length; let min=999999; state.cuts.forEach(c=>{min=Math.min(min,c.left,c.right)}); let overlaps=getOverlapPairs(); if(overlaps.length){N('cutControl').className='warnbox';N('cutControl').innerHTML='<b>Kontrola detailů: překryv.</b><br>Detaily se nesmí navzájem překrývat. Upravte polohu nebo rozměr označených detailů.'}else if(min<MIN_CUT){N('cutControl').className='warnbox';N('cutControl').innerHTML='<b>Pozor na úzké dořezy.</b><br>Min. dořez: '+mm(min)+'. Zvažte širší lemování překážky nebo optimalizaci posunu.'}else{N('cutControl').className='okbox';N('cutControl').innerHTML='<b>Min. dořez vyhovuje (≥ '+MIN_CUT+' mm).</b><br>Min. dořez: '+(min<999999?mm(min):'bez překážek')}
+ let activeButton=document.activeElement;
+ if(activeButton && activeButton.tagName==='BUTTON' && /přepočítat plán/i.test(activeButton.textContent)){
+  flashActionButton('✓ Přepočítáno');
+ }
 }
 function sx(x,scale,ox){return ox+x*scale} function sy(y,scale,oy,H){return oy+(H-y)*scale}
 
@@ -501,103 +517,43 @@ N('planSvg').addEventListener('click',handlePlanPick,true);
 function exportCsv(){let csv='Rada;Kota od okapu;Kota od hrebene;Odsazeni;Kusu;Levy kraj;Pravy kraj\n'+state.rows.map(r=>[r.row,Math.round(r.measureOkap),Math.round(r.measureHreben),Math.round(r.offset),r.full,Math.round(r.left),Math.round(r.right)].join(';')).join('\n'); let blob=new Blob([csv],{type:'text/csv;charset=utf-8'}); let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rozpis_rad_prefa_r16.csv';a.click()}
 function printPdf(){window.print()}
 
-/* VIZUÁLNÍ POTVRZENÍ TLAČÍTEK PŘEPOČTU A OPTIMALIZACE
-   Zachytíme kliknutí dříve, než proběhne inline onclick, aby prohlížeč
-   skutečně stihl zobrazit stav „pracuji“. */
-(function bindActionFeedback(){
- function getActionButton(target){
-  const b=target && target.closest ? target.closest('button') : null;
-  if(!b) return null;
-  const handler=b.getAttribute('onclick') || '';
-  if(handler.indexOf('optimize()')>-1) return {button:b,action:'optimize'};
-  if(handler.indexOf('recalc()')>-1) return {button:b,action:'recalc'};
-  return null;
- }
- function runWithFeedback(button,action){
-  if(button.dataset.busy==='1') return;
-  const original=button.textContent;
-  button.dataset.busy='1';
-  button.disabled=true;
-  button.textContent=action==='optimize'?'Optimalizuji…':'Přepočítávám…';
-  requestAnimationFrame(()=>{
-   requestAnimationFrame(()=>{
-    try{
-     if(action==='optimize') optimize(); else recalc();
-     button.textContent=action==='optimize'?'✓ Optimalizováno':'✓ Přepočítáno';
-    }catch(err){
-     console.error(err);
-     button.textContent='✕ Chyba';
+/* ZPĚTNÁ VAZBA TLAČÍTEK
+   Kliknuté tlačítko se jen vizuálně rozsvítí zeleně na 1 sekundu.
+   Původní onclick zůstává beze změny. */
+(function bindGreenClickFeedback(){
+  function flashGreen(button){
+    if(!button) return;
+
+    if(button._greenFlashTimer){
+      window.clearTimeout(button._greenFlashTimer);
     }
-    window.setTimeout(()=>{
-     button.textContent=original;
-     button.disabled=false;
-     button.dataset.busy='0';
-    },1200);
-   });
-  });
- }
- document.addEventListener('click',function(e){
-  const found=getActionButton(e.target);
-  if(!found) return;
-  e.preventDefault();
-  e.stopImmediatePropagation();
-  runWithFeedback(found.button,found.action);
- },true);
-})();
 
+    if(!button.dataset.originalInlineStyle){
+      button.dataset.originalInlineStyle=button.getAttribute('style') || '';
+    }
 
+    button.style.transition='background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease';
+    button.style.backgroundColor='#16a34a';
+    button.style.borderColor='#15803d';
+    button.style.color='#ffffff';
+    button.style.boxShadow='0 0 0 3px rgba(22,163,74,.22)';
 
-/* ZPĚTNÁ VAZBA PO KLIKNUTÍ – PLovoucí potvrzení nad výkresem */
-(function bindActionToast(){
- let busy=false;
- function actionOf(target){
-  const button=target && target.closest ? target.closest('button') : null;
-  if(!button) return null;
-  const handler=button.getAttribute('onclick') || '';
-  if(handler.indexOf('optimize()')>-1) return {button,kind:'optimize'};
-  if(handler.indexOf('recalc()')>-1) return {button,kind:'recalc'};
-  return null;
- }
- function toast(message){
-  let el=document.getElementById('actionToast');
-  if(!el){
-   el=document.createElement('div');
-   el.id='actionToast';
-   el.style.cssText='position:fixed;left:50%;top:86px;transform:translate(-50%,-12px);z-index:9999;padding:12px 18px;border-radius:10px;background:#166534;color:#fff;font:700 14px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.22);opacity:0;pointer-events:none;transition:opacity .16s ease,transform .16s ease;';
-   document.body.appendChild(el);
+    button._greenFlashTimer=window.setTimeout(function(){
+      button.setAttribute('style',button.dataset.originalInlineStyle);
+      delete button.dataset.originalInlineStyle;
+      button._greenFlashTimer=null;
+    },1000);
   }
-  el.textContent=message;
-  el.style.opacity='1';
-  el.style.transform='translate(-50%,0)';
-  clearTimeout(el._hideTimer);
-  el._hideTimer=setTimeout(()=>{
-   el.style.opacity='0';
-   el.style.transform='translate(-50%,-12px)';
-  },1400);
- }
- document.addEventListener('click',function(e){
-  const found=actionOf(e.target);
-  if(!found || busy) return;
-  busy=true;
-  e.preventDefault();
-  e.stopImmediatePropagation();
-  toast(found.kind==='optimize'?'Optimalizuji posun…':'Přepočítávám plán…');
-  window.setTimeout(()=>{
-   try{
-    if(found.kind==='optimize'){
-     optimize();
-     toast('✓ Posun optimalizován');
-    }else{
-     recalc();
-     toast('✓ Plán přepočítán');
-    }
-   }catch(err){
-    console.error(err);
-    toast('✕ Akci se nepodařilo dokončit');
-   }
-   busy=false;
-  },120);
- },true);
+
+  document.addEventListener('click',function(e){
+    const button=e.target && e.target.closest ? e.target.closest('button') : null;
+    if(!button) return;
+
+    const handler=button.getAttribute('onclick') || '';
+    if(handler.indexOf('recalc()')===-1 && handler.indexOf('optimize()')===-1) return;
+
+    flashGreen(button);
+  },true);
 })();
 
 optimize(); recalc();
