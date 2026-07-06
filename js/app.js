@@ -185,10 +185,10 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
  // Proto se osa X a Y škálují samostatně: šířka i výška vždy vyplní pracovní oblast.
  if(!isFinite(scaleX)||scaleX<=0) scaleX=0.05;
  if(!isFinite(scaleY)||scaleY<=0) scaleY=0.05;
- let rw=W*scaleX,rh=H*scaleY, ox=marginL, oy=marginT; let s=[]; s.push(`<defs><filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity=".25"/></filter><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 8 L8 0" stroke="#000" stroke-opacity=".25"/></pattern><pattern id="edgeCutHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" stroke="#b91c1c" stroke-width="3"/></pattern><pattern id="detailCutHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" stroke="#d97706" stroke-width="3"/></pattern></defs>`);
+ let rw=W*scaleX,rh=H*scaleY, ox=marginL, oy=marginT; let s=[]; s.push(`<defs><filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity=".25"/></filter><pattern id="edgeCutHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" stroke="#b91c1c" stroke-width="3"/></pattern><pattern id="detailCutHatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" stroke="#d97706" stroke-width="3"/></pattern></defs>`);
  // Maska pro šrafování: přes plochu každé překážky se šrafování vůbec nevykreslí.
  // Nejde jen o překrytí bílou výplní, takže funguje i pro komín s vlastním stylem.
- let cutMask='<mask id="detailCutMask"><rect x="0" y="0" width="'+vw+'" height="'+vh+'" fill="#fff"/>';
+ let cutMask='<mask id="detailCutMask" maskUnits="userSpaceOnUse" x="0" y="0" width="'+vw+'" height="'+vh+'"><rect x="0" y="0" width="'+vw+'" height="'+vh+'" fill="#fff"/>';
  state.obstacles.forEach(o=>{
    const mx=sx(o.x,scaleX,ox), my=sy(o.y+o.h,scaleY,oy,H), mw=o.w*scaleX, mh=o.h*scaleY;
    if(o.type==='vikyr'){
@@ -215,33 +215,33 @@ function renderSvg(){let svg=N('planSvg'),p=getParams(); let W=p.W,H=p.H;
    let tileNo=idx+1;
    let selTile=state.selectedTile&&state.selectedTile.row===row.row&&state.selectedTile.index===tileNo;
    let roofCut=(!t.full)||(Math.min(TILE_H,H-(row.row-1)*TILE_H)<TILE_H);
-   s.push(`<rect x="${x}" y="${yTop}" width="${w}" height="${h}" fill="${t.full?'var(--tile2)':'#f4c6c6'}" stroke="${selTile?'#005bbb':'#77808a'}" stroke-width="${selTile?3:0.8}" opacity=".96" data-tile-row="${row.row}" data-tile-index="${tileNo}" onpointerdown="selectTile(${row.row},${tileNo});event.preventDefault();event.stopPropagation();" onclick="selectTile(${row.row},${tileNo});event.stopPropagation();" onmouseenter="hoverTile(${row.row},${tileNo})" onmouseleave="hoverTile(null,null)" style="cursor:pointer"></rect>`);
+   s.push(`<rect x="${x}" y="${yTop}" width="${w}" height="${h}" fill="${t.full?'var(--tile2)':'#f4c6c6'}" stroke="${selTile?'#005bbb':'#77808a'}" stroke-width="${selTile?3:0.8}" opacity=".96" data-tile-row="${row.row}" data-tile-index="${tileNo}" onpointerdown="selectTile(${row.row},${tileNo});event.preventDefault();event.stopPropagation();" onclick="selectTile(${row.row},${tileNo});event.stopPropagation();" onmouseenter="hoverTile(${row.row},${tileNo})" onmouseleave="hoverTile(null,null)" style="cursor:pointer" mask="url(#detailCutMask)"></rect>`);
    if(roofCut){
     s.push(`<rect x="${x}" y="${yTop}" width="${w}" height="${h}" fill="url(#edgeCutHatch)" mask="url(#detailCutMask)" opacity=".42" stroke="#b91c1c" stroke-width="1.6" pointer-events="none"/>`);
    }
   });
-  s.push(`<rect class="row-hover-overlay" data-row-hover="${row.row}" x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="#16a34a" opacity=".16" stroke="#16a34a" stroke-width="3" pointer-events="none" display="${row.row===state.hoverRow?'block':'none'}"/>`);
+  s.push(`<rect class="row-hover-overlay" data-row-hover="${row.row}" x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="#16a34a" opacity=".16" stroke="#16a34a" stroke-width="3" pointer-events="none" mask="url(#detailCutMask)" display="${row.row===state.hoverRow?'block':'none'}"/>`);
   s.push(`</g>`);
   if(row.row%2===0){let x=sx(row.offset,scaleX,ox); s.push(`<line x1="${x}" x2="${x}" y1="${oy}" y2="${oy+rh}" stroke="#d58b30" stroke-dasharray="8 7" stroke-width="1.3"/>`)}
  }
  // trvalé modré označení vybrané řady
  if(state.selectedRow){
   let r=state.rows.find(x=>x.row===state.selectedRow);
-  if(r){let yTop=sy(Math.min(H,r.row*TILE_H),scaleY,oy,H), yBot=sy((r.row-1)*TILE_H,scaleY,oy,H); s.push(`<rect x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="#0871b9" opacity=".10" pointer-events="none"/><rect x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="none" stroke="#0871b9" stroke-width="4" pointer-events="none"/>`)}
+  if(r){let yTop=sy(Math.min(H,r.row*TILE_H),scaleY,oy,H), yBot=sy((r.row-1)*TILE_H,scaleY,oy,H); s.push(`<rect x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="#0871b9" opacity=".10" pointer-events="none" mask="url(#detailCutMask)"/><rect x="${ox}" y="${yTop}" width="${rw}" height="${yBot-yTop}" fill="none" stroke="#0871b9" stroke-width="4" pointer-events="none" mask="url(#detailCutMask)"/>`)}
  }
  // vybraná / najetá taška – pouze zvýraznění v grafice, hodnoty jsou v samostatném boxu
  if(state.selectedTile){
   const t=getTileAt(state.selectedTile.row,state.selectedTile.index);
   if(t){
    const x=sx(t.x,scaleX,ox), y=sy(t.y+t.h,scaleY,oy,H), w=t.w*scaleX, h=t.h*scaleY;
-   s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#0871b9" opacity=".18" stroke="#005bbb" stroke-width="3.5" pointer-events="none"/>`);
+   s.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#0871b9" opacity=".18" stroke="#005bbb" stroke-width="3.5" pointer-events="none" mask="url(#detailCutMask)"/>`);
   }
  }
  if(state.hoverTile){
   const ht=getTileAt(state.hoverTile.row,state.hoverTile.index);
   if(ht){
    const hx=sx(ht.x,scaleX,ox), hy=sy(ht.y+ht.h,scaleY,oy,H), hw=ht.w*scaleX, hh=ht.h*scaleY;
-   s.push(`<rect x="${hx}" y="${hy}" width="${hw}" height="${hh}" fill="#16a34a" opacity=".14" stroke="#16a34a" stroke-width="3" pointer-events="none"/>`);
+   s.push(`<rect x="${hx}" y="${hy}" width="${hw}" height="${hh}" fill="#16a34a" opacity=".14" stroke="#16a34a" stroke-width="3" pointer-events="none" mask="url(#detailCutMask)"/>`);
    // Číslo tašky počítané od levého štítu – zobrazuje se pouze při najetí myší.
    const label=String(ht.index);
    const lw=Math.max(24,label.length*8+14);
