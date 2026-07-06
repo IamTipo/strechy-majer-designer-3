@@ -15,25 +15,9 @@ function rowTiles(W,r){let off=rowOffset(r), arr=[]; let first=Math.floor((-off)
 function analyzeRows(){let {W,H}=getParams(); let rows=Math.ceil(H/TILE_H); let out=[],cuts=[]; for(let r=1;r<=rows;r++){let tiles=rowTiles(W,r); let full=tiles.filter(t=>t.full).length; let left=tiles[0]?.w||0, right=tiles[tiles.length-1]?.w||0; let y0=(r-1)*TILE_H,y1=Math.min(H,r*TILE_H); let note=(r%2===0?'1/2 na začátku':'Celá taška'); if(left<MIN_CUT||right<MIN_CUT) note+=' – úzký kraj'; for(const o of state.obstacles){if(o.y<y1 && o.y+o.h>y0){let lt=tiles.find(t=>t.a<=o.x && t.b>o.x), rt=tiles.find(t=>t.a<o.x+o.w && t.b>=o.x+o.w); let lc=lt?o.x-lt.a:0, rc=rt?rt.b-(o.x+o.w):0; let ok=lc>=MIN_CUT&&rc>=MIN_CUT; cuts.push({row:r,obs:o.name,left:lc,right:rc,ok}); if(!ok) note+=' – řešit lemování/posun';}}
  out.push({row:r,measureOkap:Math.min(H,r*TILE_H),measureHreben:Math.max(0,H-Math.min(H,r*TILE_H)),offset:rowOffset(r),tiles,full,left,right,note,bad:left<MIN_CUT||right<MIN_CUT})} state.rows=out; state.cuts=cuts;}
 function scoreShift(shift){let old=state.baseShift; state.baseShift=shift; analyzeRows(); let score=0; for(const row of state.rows){if(row.left<MIN_CUT)score+=10000+(MIN_CUT-row.left)*10;if(row.right<MIN_CUT)score+=10000+(MIN_CUT-row.right)*10; score+=Math.abs(row.left-row.right)/20} for(const c of state.cuts){if(!c.ok)score+=5000+(Math.max(0,MIN_CUT-c.left)+Math.max(0,MIN_CUT-c.right))*20} state.baseShift=old; return score}
-function flashActionButton(doneText){
- const button=document.activeElement;
- if(!button || button.tagName!=='BUTTON') return;
- const original=button.dataset.originalLabel || button.textContent;
- button.dataset.originalLabel=original;
- button.textContent=doneText;
- button.disabled=true;
- window.setTimeout(()=>{
-  button.textContent=original;
-  button.disabled=false;
- },1100);
-}
-function optimize(){let best=0,b=1e99,tested=0; for(let s=0;s<TILE_W;s+=10){let sc=scoreShift(s);tested++; if(sc<b){b=sc;best=s}} state.baseShift=best; N('optInfo').innerHTML='Optimalizace posunu: <b>AKTIVNÍ</b><br>Testováno variant: '+tested+'<br>Vybraný posun: '+mm(best); recalc(); flashActionButton('✓ Optimalizováno');}
+function optimize(){let best=0,b=1e99,tested=0; for(let s=0;s<TILE_W;s+=10){let sc=scoreShift(s);tested++; if(sc<b){b=sc;best=s}} state.baseShift=best; N('optInfo').innerHTML='Optimalizace posunu: <b>AKTIVNÍ</b><br>Testováno variant: '+tested+'<br>Vybraný posun: '+mm(best); recalc();}
 function recalc(){let p=getParams(); let slope=N('slopeStatus'); if(p.slope<MIN_SLOPE){slope.className='status bad';slope.textContent='Nevyhovuje – min. sklon PREFA R.16 je 17°';}else{slope.className='status';slope.textContent='Vyhovuje (min. 17°)';} let sep=N('sepStatus'); if(p.slope>=MIN_SLOPE&&p.slope<=SEP_MAX){sep.className='status warn';sep.textContent='Povinná při sklonu 17–25° dle pokynů PREFA';}else if(p.slope<MIN_SLOPE){sep.className='status bad';sep.textContent='Nejdříve ověřit vhodnost krytiny pro daný sklon';}else{sep.className='status';sep.textContent='Běžný rozsah – ověřte dle skladby střechy';}
  analyzeRows(); validateSelectedTile(); validateSelectedObstacle(); renderObstacles(); renderTables(); renderSvg(); updateTileInfo(); updateObstacleInfo(); let area=p.W*p.H/1e6; let tiles=Math.ceil(area*CONS); let obsArea=state.obstacles.reduce((a,o)=>a+o.w*o.h/1e6,0); N('areaSum').textContent=area.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' m²'; N('tileSum').textContent=fmt(tiles)+' ks'; N('wasteSum').textContent=obsArea.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' m²'; N('obsSum').textContent=state.obstacles.length; let min=999999; state.cuts.forEach(c=>{min=Math.min(min,c.left,c.right)}); let overlaps=getOverlapPairs(); if(overlaps.length){N('cutControl').className='warnbox';N('cutControl').innerHTML='<b>Kontrola detailů: překryv.</b><br>Detaily se nesmí navzájem překrývat. Upravte polohu nebo rozměr označených detailů.'}else if(min<MIN_CUT){N('cutControl').className='warnbox';N('cutControl').innerHTML='<b>Pozor na úzké dořezy.</b><br>Min. dořez: '+mm(min)+'. Zvažte širší lemování překážky nebo optimalizaci posunu.'}else{N('cutControl').className='okbox';N('cutControl').innerHTML='<b>Min. dořez vyhovuje (≥ '+MIN_CUT+' mm).</b><br>Min. dořez: '+(min<999999?mm(min):'bez překážek')}
- let activeButton=document.activeElement;
- if(activeButton && activeButton.tagName==='BUTTON' && /přepočítat plán/i.test(activeButton.textContent)){
-  flashActionButton('✓ Přepočítáno');
- }
 }
 function sx(x,scale,ox){return ox+x*scale} function sy(y,scale,oy,H){return oy+(H-y)*scale}
 
@@ -528,74 +512,57 @@ function exportCsv(){let csv='Rada;Kota od okapu;Kota od hrebene;Odsazeni;Kusu;L
 function printPdf(){window.print()}
 
 /* ZPĚTNÁ VAZBA TLAČÍTEK
-   Zvýraznění se spouští už při stisku myši/prstu (pointerdown),
-   tedy ještě před vlastním synchronním přepočtem. */
-(function bindGreenClickFeedback(){
-  const GREEN_STYLE={
-    'background-color':'#16a34a',
-    'border-color':'#15803d',
-    'color':'#ffffff',
-    'box-shadow':'0 0 0 3px rgba(22,163,74,.30)',
-    'transition':'background-color .10s ease, border-color .10s ease, color .10s ease, box-shadow .10s ease'
-  };
+   Jediný mechanismus: po dokončení běžného onclick se tlačítko
+   na 1 sekundu zeleně zvýrazní. Nemění text ani neblokuje akci. */
+function bindActionButtonFlash(){
+  const buttons=[
+    ...document.querySelectorAll('button[onclick*="optimize()"], button[onclick*="recalc()"]')
+  ];
 
-  function isActionButton(button){
-    if(!button) return false;
-    const handler=button.getAttribute('onclick') || '';
-    return handler.includes('optimize()') || handler.includes('recalc()');
-  }
+  function flash(button){
+    if(!button)return;
 
-  function flashGreen(button){
-    if(!button || !isActionButton(button)) return;
-
-    if(button._greenFlashTimer){
-      window.clearTimeout(button._greenFlashTimer);
+    if(button._actionFlashTimer){
+      clearTimeout(button._actionFlashTimer);
     }
 
-    if(!button._greenOriginalStyle){
-      button._greenOriginalStyle={};
-      Object.keys(GREEN_STYLE).forEach(property=>{
-        button._greenOriginalStyle[property]={
-          value:button.style.getPropertyValue(property),
-          priority:button.style.getPropertyPriority(property)
-        };
-      });
-    }
+    const original={
+      background:button.style.getPropertyValue('background'),
+      backgroundPriority:button.style.getPropertyPriority('background'),
+      backgroundColor:button.style.getPropertyValue('background-color'),
+      backgroundColorPriority:button.style.getPropertyPriority('background-color'),
+      borderColor:button.style.getPropertyValue('border-color'),
+      borderColorPriority:button.style.getPropertyPriority('border-color'),
+      color:button.style.getPropertyValue('color'),
+      colorPriority:button.style.getPropertyPriority('color'),
+      boxShadow:button.style.getPropertyValue('box-shadow'),
+      boxShadowPriority:button.style.getPropertyPriority('box-shadow')
+    };
 
-    Object.entries(GREEN_STYLE).forEach(([property,value])=>{
-      button.style.setProperty(property,value,'important');
-    });
+    button.style.setProperty('background','#16a34a','important');
+    button.style.setProperty('background-color','#16a34a','important');
+    button.style.setProperty('border-color','#15803d','important');
+    button.style.setProperty('color','#ffffff','important');
+    button.style.setProperty('box-shadow','0 0 0 3px rgba(22,163,74,.32)','important');
 
-    button._greenFlashTimer=window.setTimeout(()=>{
-      const original=button._greenOriginalStyle || {};
-
-      Object.keys(GREEN_STYLE).forEach(property=>{
-        const item=original[property];
-        if(item && item.value){
-          button.style.setProperty(property,item.value,item.priority || '');
-        }else{
-          button.style.removeProperty(property);
-        }
-      });
-
-      button._greenOriginalStyle=null;
-      button._greenFlashTimer=null;
+    button._actionFlashTimer=setTimeout(()=>{
+      button.style.setProperty('background',original.background,original.backgroundPriority);
+      button.style.setProperty('background-color',original.backgroundColor,original.backgroundColorPriority);
+      button.style.setProperty('border-color',original.borderColor,original.borderColorPriority);
+      button.style.setProperty('color',original.color,original.colorPriority);
+      button.style.setProperty('box-shadow',original.boxShadow,original.boxShadowPriority);
+      button._actionFlashTimer=null;
     },1000);
   }
 
-  /* Capture fáze + pointerdown = prohlížeč má možnost stav vykreslit
-     ještě před následným clickem a přepočtem. */
-  document.addEventListener('pointerdown',function(e){
-    const button=e.target && e.target.closest ? e.target.closest('button') : null;
-    flashGreen(button);
-  },true);
+  buttons.forEach(button=>{
+    button.addEventListener('click',()=>{
+      /* Inline onclick už doběhl; rAF dovolí prohlížeči stav skutečně vykreslit. */
+      requestAnimationFrame(()=>flash(button));
+    });
+  });
+}
 
-  /* Záloha pro ovládání klávesnicí. */
-  document.addEventListener('keydown',function(e){
-    if(e.key!=='Enter' && e.key!==' ') return;
-    const button=document.activeElement;
-    flashGreen(button);
-  },true);
-})();
-
-optimize(); recalc();
+optimize();
+recalc();
+bindActionButtonFlash();
